@@ -1,6 +1,22 @@
 import '@testing-library/jest-dom';
+import React from 'react';
+
+// Mock the main plugin entry point to avoid registration code
+jest.mock('../src/index.tsx', () => ({
+  RoutingPath: {
+    ConstraintTemplates: '/gatekeeper/constraint-templates',
+    ConstraintTemplate: '/gatekeeper/constraint-template/:name',
+    Constraints: '/gatekeeper/constraints',
+    Constraint: '/gatekeeper/constraint/:kind/:name',
+    Violations: '/gatekeeper/violations',
+  },
+}));
 
 // Mock Headlamp plugin modules
+jest.mock('@kinvolk/headlamp-plugin/lib', () => ({
+  registerRoute: jest.fn(),
+  registerSidebarEntry: jest.fn(),
+}));
 jest.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
   SectionBox: ({ children, title }: any) => <div data-testid="section-box" title={title}>{children}</div>,
   Link: ({ children, routeName, params }: any) => (

@@ -22,7 +22,7 @@ module.exports = {
       statements: 70,
     },
   },
-  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup.tsx'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {

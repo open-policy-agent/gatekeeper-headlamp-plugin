@@ -1,27 +1,25 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import ConstraintTemplateList from '../../src/constraint-template/List';
-import { ConstraintTemplateClass } from '../../src/model';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import * as model from '../../src/model';
 
-jest.mock('../../src/model');
+// Mock the model module
+jest.mock('../../src/model', () => ({
+  ConstraintTemplateClass: {
+    useApiList: jest.fn(),
+  },
+}));
+
+// Mock ApiProxy
+const mockApiRequest = jest.fn();
+jest.mock('@kinvolk/headlamp-plugin/lib/ApiProxy', () => ({
+  request: mockApiRequest,
+}));
 
 describe('ConstraintTemplateList', () => {
-  let mockSetConstraintTemplates: jest.Mock;
-  let mockApiRequest: jest.Mock;
-
   beforeEach(() => {
-    mockSetConstraintTemplates = jest.fn();
-    mockApiRequest = jest.fn();
-    (ApiProxy as any).request = mockApiRequest;
-
-    (ConstraintTemplateClass.useApiList as jest.Mock) = jest.fn((callback) => {
-      mockSetConstraintTemplates = callback;
-    });
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
+    mockApiRequest.mockResolvedValue({});
   });
 
   it('renders loading state initially', () => {
@@ -31,6 +29,7 @@ describe('ConstraintTemplateList', () => {
 
   it('displays Gatekeeper not installed message when API returns 404', async () => {
     mockApiRequest.mockRejectedValue({ status: 404, message: 'not found' });
+    (model.ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation(() => {});
 
     render(<ConstraintTemplateList />);
 
@@ -66,7 +65,7 @@ describe('ConstraintTemplateList', () => {
       },
     ];
 
-    (ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
+    (model.ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
       callback(mockTemplates);
     });
 
@@ -102,7 +101,7 @@ describe('ConstraintTemplateList', () => {
       },
     ];
 
-    (ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
+    (model.ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
       callback(mockTemplates);
     });
 
@@ -158,7 +157,7 @@ describe('ConstraintTemplateList', () => {
       },
     ];
 
-    (ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
+    (model.ConstraintTemplateClass.useApiList as jest.Mock).mockImplementation((callback) => {
       callback(mockTemplates);
     });
 
