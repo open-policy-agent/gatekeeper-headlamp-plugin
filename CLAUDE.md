@@ -16,13 +16,15 @@ make build       # Build plugin only
 make deploy      # Deploy to Headlamp plugins directory
 ```
 
-### Code Quality
+### Code Quality & Testing
 ```bash
 npm run lint           # Run ESLint
 npm run lint-fix       # Auto-fix ESLint issues
 npm run tsc            # TypeScript type checking
 npm run format         # Run Prettier
-npm run test           # Run tests
+npm test               # Run unit tests
+npm run test:coverage  # Run tests with coverage
+npm run test:integration  # Run integration tests (requires kind cluster)
 ```
 
 ### Testing & Validation
@@ -30,6 +32,9 @@ npm run test           # Run tests
 make validate          # Clean build with validation
 make check-install     # Verify plugin is installed
 make check-headlamp    # Check if Headlamp is running on localhost:4466
+
+# Integration testing
+./scripts/run-integration-tests.sh  # Automated kind cluster + Gatekeeper setup + tests
 ```
 
 ### Deployment Locations
@@ -135,6 +140,56 @@ src/
     └── TemplateDetails.tsx # Template details and installation
 ```
 
+## Testing
+
+### Test Infrastructure
+
+The project uses Jest with React Testing Library for comprehensive test coverage:
+
+- **Unit Tests**: Component and utility tests with mocked dependencies (`test/**/*.test.tsx`)
+- **Integration Tests**: Tests against real Kubernetes cluster with Gatekeeper (`test/integration/`)
+- **Coverage Thresholds**: 70% for branches, functions, lines, and statements
+- **CI/CD**: GitHub Actions runs all tests on every push/PR
+
+### Running Tests
+
+```bash
+npm test                        # Run all unit tests
+npm run test:coverage          # Generate coverage report
+npm run test:integration       # Run integration tests (requires cluster)
+./scripts/run-integration-tests.sh  # Automated setup + integration tests
+```
+
+### Test Setup
+
+- **Mocked modules** in `test/setup.ts`:
+  - Headlamp components (`SectionBox`, `Link`, `Loader`)
+  - Kubernetes client classes (`KubeObject`, `makeCustomResourceClass`)
+  - API proxy functions
+  - React Router hooks (`useHistory`, `useLocation`, `useParams`)
+
+### Integration Test Requirements
+
+Integration tests require:
+1. Kubernetes cluster (automated via kind in CI)
+2. Gatekeeper installed in cluster
+3. kubectl configured
+4. Test ConstraintTemplates deployed
+
+The `scripts/run-integration-tests.sh` script handles all setup automatically for local testing.
+
+### CI/CD Pipeline
+
+GitHub Actions workflow (`.github/workflows/test.yml`) includes:
+1. **Lint and Type Check**: ESLint, TypeScript compiler
+2. **Unit Tests**: Jest with coverage reporting to Codecov
+3. **Integration Tests**:
+   - Creates kind cluster
+   - Installs Gatekeeper
+   - Deploys test templates
+   - Runs integration test suite
+4. **Build Test**: Validates plugin builds successfully
+
 ## Development Notes
 
 - The plugin targets Headlamp v0.12.0+
@@ -142,3 +197,4 @@ src/
 - Material-UI v5 is used for UI components
 - TypeScript 5+ for type safety
 - ESLint config extends `@headlamp-k8s` preset
+- Comprehensive test coverage with Jest and React Testing Library

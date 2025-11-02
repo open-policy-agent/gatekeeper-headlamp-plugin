@@ -1,0 +1,189 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript compiler check
+        run: npm run tsc
+
+      - name: Check code formatting
+        run: npm run format -- --check
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: unit-tests-coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: always()
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: gatekeeper-test
+          wait: 120s
+
+      - name: Verify cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Install Gatekeeper
+        run: |
+          # Install Gatekeeper using kubectl
+          kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/master/deploy/gatekeeper.yaml
+
+      - name: Wait for Gatekeeper to be ready
+        run: |
+          echo "Waiting for Gatekeeper controller to be ready..."
+          kubectl wait --for=condition=Ready pod -l control-plane=controller-manager -n gatekeeper-system --timeout=300s
+
+          echo "Waiting for Gatekeeper audit to be ready..."
+          kubectl wait --for=condition=Ready pod -l control-plane=audit-controller -n gatekeeper-system --timeout=300s
+
+          echo "Verifying Gatekeeper installation..."
+          kubectl get pods -n gatekeeper-system
+          kubectl get crds | grep gatekeeper
+
+      - name: Install test ConstraintTemplates
+        run: |
+          # Install K8sRequiredLabels template
+          kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/general/requiredlabels/template.yaml
+
+          # Wait for template to be created
+          sleep 5
+          kubectl get constrainttemplates
+
+      - name: Run integration tests
+        run: npm test -- --testPathPattern=integration --coverage --watchAll=false
+        env:
+          CI: true
+
+      - name: Upload integration test coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: integration
+          name: integration-tests-coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: always()
+
+      - name: Debug - Show Gatekeeper resources on failure
+        if: failure()
+        run: |
+          echo "=== Gatekeeper Pods ==="
+          kubectl get pods -n gatekeeper-system
+
+          echo "=== Gatekeeper Logs ==="
+          kubectl logs -n gatekeeper-system -l control-plane=controller-manager --tail=100 || true
+
+          echo "=== ConstraintTemplates ==="
+          kubectl get constrainttemplates
+
+          echo "=== Constraints ==="
+          kubectl get constraints --all-namespaces || true
+
+  build-test:
+    name: Build Plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Extract plugin
+        run: npm run extract
+
+      - name: Verify build artifacts
+        run: |
+          if [ ! -f ".plugins/main.js" ]; then
+            echo "Error: main.js not found in .plugins/"
+            exit 1
+          fi
+
+          if [ ! -f ".plugins/package.json" ]; then
+            echo "Error: package.json not found in .plugins/"
+            exit 1
+          fi
+
+          echo "Build artifacts verified successfully"
+          ls -lah .plugins/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-build
+          path: .plugins/
+          retention-days: 7

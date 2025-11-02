@@ -10,10 +10,12 @@
     "lint": "headlamp-plugin lint",
     "lint-fix": "headlamp-plugin lint --fix",
     "format": "headlamp-plugin format",
-    "test": "headlamp-plugin test",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "jest --testPathPattern=integration",
     "tsc": "headlamp-plugin tsc",
-    "extract": "headlamp-plugin extract . .plugins",
-    "test:dynamic-constraints": "node --experimental-vm-modules ./test/test-dynamic-constraints.js"
+    "extract": "headlamp-plugin extract . .plugins"
   },
   "keywords": [
     "headlamp",
@@ -35,9 +37,17 @@
   },
   "devDependencies": {
     "@kinvolk/headlamp-plugin": "^0.12.0",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/jest": "^29.5.11",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.0.0"
   },
   "dependencies": {
