@@ -52,3 +52,6 @@ debug-*.js
 # Package lock files (optional, depending on preference)
 # package-lock.json
 # yarn.lock
+
+# Claude files
+.claude/

@@ -32,7 +32,6 @@
 # ----------------
 # First time setup:    make setup
 # Daily development:    make dev
-# Fast iteration:       make quick
 # Clean validation:     make validate
 # Debug build issues:   make build-debug
 #
@@ -61,9 +60,6 @@ PLUGIN_INSTALL_DIR = $(HEADLAMP_PLUGINS_DIR)/$(PLUGIN_NAME)
 SOURCE_DIR = .plugins
 DIST_DIR = dist
 
-# ============================================================================
-# DEFAULT TARGET
-# ============================================================================
 # ============================================================================
 # DEFAULT TARGET
 # ============================================================================
@@ -260,12 +256,6 @@ watch:
 		$(MAKE) dev; \
 	done
 
-# Generate TypeScript types from Gatekeeper CRDs
-.PHONY: generate-types
-generate-types:
-	@echo "Generating TypeScript types from CRDs..."
-	npm run crd-to-types
-
 # ============================================================================
 # HELP & DOCUMENTATION
 # ============================================================================
@@ -280,7 +270,6 @@ help:
 	@echo "COMMON WORKFLOWS:"
 	@echo "  make setup      # First time: install, build, and deploy"
 	@echo "  make dev        # Development: build and deploy"
-	@echo "  make quick      # Fast iteration: build and deploy without clean"
 	@echo "  make validate   # Ensure everything builds correctly"
 	@echo "  make clean dev  # Clean build and deploy"
 	@echo ""
@@ -313,7 +302,6 @@ help:
 	@echo "  validate        Clean build with validation checks"
 	@echo ""
 	@echo "UTILITIES:"
-	@echo "  generate-types  Generate TypeScript types from Gatekeeper CRDs"
 	@echo "  help            Show this help message"
 	@echo ""
 	@echo "TROUBLESHOOTING:"

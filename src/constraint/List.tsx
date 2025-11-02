@@ -15,11 +15,16 @@ import {
   FormControl,
   InputLabel,
   Box,
+  Button,
+  Alert,
+  AlertTitle,
 } from '@mui/material';
 import React, { useState, useEffect, useMemo } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import { RoutingPath } from '../index';
 import { ConstraintClass, ConstraintTemplateClass } from '../model';
 import { Constraint } from '../types';
+import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
 interface ConstraintListProps {}
 
@@ -29,6 +34,9 @@ function ConstraintList({}: ConstraintListProps) {
   const [enforcementActionFilter, setEnforcementActionFilter] = useState<string>('All');
   const [uniqueKinds, setUniqueKinds] = useState<string[]>(['All']);
   const [uniqueEnforcementActions, setUniqueEnforcementActions] = useState<string[]>(['All']);
+  const [gatekeeperNotInstalled, setGatekeeperNotInstalled] = useState(false);
+  const history = useHistory();
+  const location = useLocation();
 
   console.log('🔍 [ConstraintList] component mounted');
 
@@ -38,6 +46,42 @@ function ConstraintList({}: ConstraintListProps) {
   }, []); // Empty dependency array: callback is created once
 
   ConstraintClass.useApiList(handleSetConstraints);
+
+  // Check if Gatekeeper CRD is installed
+  useEffect(() => {
+    const checkGatekeeperCRD = async () => {
+      try {
+        // Get the request function from ApiProxy
+        const apiProxyModule = ApiProxy as any;
+        let requestFunc: ((url: string) => Promise<any>) | undefined;
+
+        if (typeof apiProxyModule.request === 'function') {
+          requestFunc = apiProxyModule.request;
+        } else if (typeof apiProxyModule.default === 'function') {
+          requestFunc = apiProxyModule.default;
+        } else if (apiProxyModule.default && typeof apiProxyModule.default.request === 'function') {
+          requestFunc = apiProxyModule.default.request;
+        }
+
+        if (!requestFunc) {
+          console.error('[ConstraintList] Could not find API request function');
+          return;
+        }
+
+        // Try to fetch constraint templates - if this fails, Gatekeeper is likely not installed
+        await requestFunc('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+      } catch (error: any) {
+        // Check if it's a 404 or connection error indicating CRD doesn't exist
+        if (error?.status === 404 || error?.message?.includes('404') ||
+            error?.message?.includes('not found') || error?.message?.includes('no matches')) {
+          console.log('[ConstraintList] Gatekeeper CRDs not found');
+          setGatekeeperNotInstalled(true);
+        }
+      }
+    };
+
+    checkGatekeeperCRD();
+  }, []);
 
   useEffect(() => {
     if (constraints) {
@@ -65,6 +109,39 @@ function ConstraintList({}: ConstraintListProps) {
         return kindMatch && enforcementActionMatch;
       });
   }, [constraints, kindFilter, enforcementActionFilter]);
+
+  // Show install prompt if Gatekeeper is not installed
+  if (gatekeeperNotInstalled) {
+    const handleInstallGatekeeper = () => {
+      // Navigate to Gatekeeper Helm chart with cluster context
+      // Extract cluster from current URL (format: /c/:cluster/...)
+      const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
+      const cluster = clusterMatch ? clusterMatch[1] : null;
+
+      if (cluster) {
+        history.push(`/c/${cluster}/helm/gatekeeper/charts/gatekeeper`);
+      }
+    };
+
+    return (
+      <SectionBox title="Constraints">
+        <Alert severity="warning" sx={{ margin: 2 }}>
+          <AlertTitle>Gatekeeper Not Found</AlertTitle>
+          <Typography variant="body2" sx={{ marginBottom: 2 }}>
+            Gatekeeper does not appear to be installed in your cluster.
+            Install Gatekeeper to start using policy enforcement and constraints.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleInstallGatekeeper}
+          >
+            Install Gatekeeper
+          </Button>
+        </Alert>
+      </SectionBox>
+    );
+  }
 
   if (!constraints) {
     console.log('⏳ [ConstraintList] Loading constraints...');
