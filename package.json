@@ -1,6 +1,6 @@
 {
   "name": "gatekeeper-headlamp-plugin",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Headlamp plugin for OPA Gatekeeper policies and violations",
   "main": "dist/main.js",
   "scripts": {
