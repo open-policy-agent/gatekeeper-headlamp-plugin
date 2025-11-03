@@ -21,7 +21,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { ConstraintTemplateClass } from '../model';
 import { ConstraintTemplate } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
@@ -33,6 +33,7 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
   const { name } = useParams<{ name: string }>();
   const [item, setItem] = useState<KubeObject | null>(null);
   const history = useHistory();
+  const location = useLocation();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -85,7 +86,15 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
 
       // Navigate back to constraint templates list after a short delay
       setTimeout(() => {
-        history.push(RoutingPath.ConstraintTemplates);
+        // Extract cluster from current URL (format: /c/:cluster/...)
+        const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
+        const cluster = clusterMatch ? clusterMatch[1] : null;
+        
+        if (cluster) {
+          history.push(`/c/${cluster}${RoutingPath.ConstraintTemplates}`);
+        } else {
+          history.push(RoutingPath.ConstraintTemplates);
+        }
       }, 1500);
 
     } catch (error: any) {
