@@ -21,7 +21,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { ConstraintClass } from '../model';
 import { Constraint } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
@@ -30,9 +30,10 @@ import { RoutingPath } from '../index';
 interface ConstraintDetailsProps {}
 
 function ConstraintDetails({}: ConstraintDetailsProps) {
-  const { name } = useParams<{ kind: string; name: string }>();
+  const { kind, name } = useParams<{ kind: string; name: string }>();
   const [item, setItem] = useState<any | null>(null);
   const history = useHistory();
+  const location = useLocation();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -65,33 +66,58 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!name || !constraint) return;
+    console.log('=== DELETE CONSTRAINT DEBUG START ===');
+    console.log('URL params - kind:', kind, 'name:', name);
+    console.log('constraint object:', constraint);
+    console.log('constraint.kind:', constraint?.kind);
 
+    if (!name || !constraint) {
+      console.error('Cannot delete: name or constraint is missing', { name, constraint });
+      setSnackbarState({
+        open: true,
+        message: 'Cannot delete: missing constraint information',
+        severity: 'error',
+      });
+      return;
+    }
+
+    console.log('Starting delete process for constraint:', { name, urlKind: kind, constraintKind: constraint.kind });
     setIsDeleting(true);
     setDeleteDialogOpen(false);
 
     try {
-      // First, try to get the correct plural form from ConstraintTemplates
-      let constraintPlural = '';
+      // The 'kind' parameter from the URL is actually the plural form used in the API
+      // But if it's not available, we need to determine it from ConstraintTemplates
+      let constraintPlural = kind ? kind.toLowerCase() : '';
 
-      try {
-        const templatesResponse = await ApiProxy.request('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
-        if (templatesResponse && templatesResponse.items) {
-          const matchingTemplate = templatesResponse.items.find((template: any) =>
-            template.spec?.crd?.spec?.names?.kind === constraint.kind
-          );
+      // If kind from URL is not available or seems like a singular form, try to get the correct plural from ConstraintTemplates
+      if (!constraintPlural || constraintPlural === constraint.kind.toLowerCase()) {
+        try {
+          console.log('Fetching ConstraintTemplates to determine plural form...');
+          const templatesResponse = await ApiProxy.request('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+          console.log('ConstraintTemplates response:', templatesResponse);
 
-          if (matchingTemplate && matchingTemplate.spec?.crd?.spec?.names?.plural) {
-            constraintPlural = matchingTemplate.spec.crd.spec.names.plural.toLowerCase();
+          if (templatesResponse && templatesResponse.items) {
+            const matchingTemplate = templatesResponse.items.find((template: any) =>
+              template.spec?.crd?.spec?.names?.kind === constraint.kind
+            );
+
+            if (matchingTemplate && matchingTemplate.spec?.crd?.spec?.names?.plural) {
+              constraintPlural = matchingTemplate.spec.crd.spec.names.plural.toLowerCase();
+              console.log(`Found matching template with plural: ${constraintPlural}`);
+            } else {
+              console.warn(`No matching template found for kind: ${constraint.kind}`);
+            }
           }
+        } catch (templateError: any) {
+          console.warn('Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization', templateError);
         }
-      } catch (templateError) {
-        console.warn('Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization');
       }
 
       // Fallback to simple pluralization if we couldn't get it from ConstraintTemplates
       if (!constraintPlural) {
         const constraintKind = constraint.kind.toLowerCase();
+        console.log(`Using fallback pluralization for kind: ${constraintKind}`);
 
         if (constraintKind.endsWith('y')) {
           constraintPlural = constraintKind.slice(0, -1) + 'ies';
@@ -100,15 +126,29 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         } else {
           constraintPlural = constraintKind + 's';
         }
+        console.log(`Computed plural form: ${constraintPlural}`);
       }
 
+      if (!constraintPlural) {
+        throw new Error(`Could not determine plural form for constraint kind: ${constraint.kind}`);
+      }
+
+      if (!name) {
+        throw new Error('Constraint name is missing');
+      }
+
+      const deleteUrl = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${name}`;
+      console.log(`Attempting to delete constraint with URL: ${deleteUrl}`);
+      console.log(`Full URL parts - plural: "${constraintPlural}", name: "${name}"`);
+
       await ApiProxy.request(
-        `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${name}`,
+        deleteUrl,
         {
           method: 'DELETE',
         }
       );
 
+      console.log('Delete request successful');
       setSnackbarState({
         open: true,
         message: `Constraint "${name}" deleted successfully`,
@@ -117,10 +157,26 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
       // Navigate back to constraints list after a short delay
       setTimeout(() => {
-        history.push(RoutingPath.Constraints);
+        // Extract cluster from current URL (format: /c/:cluster/...)
+        const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
+        const cluster = clusterMatch ? clusterMatch[1] : null;
+        
+        if (cluster) {
+          history.push(`/c/${cluster}${RoutingPath.Constraints}`);
+        } else {
+          history.push(RoutingPath.Constraints);
+        }
       }, 1500);
 
     } catch (error: any) {
+      console.error('Failed to delete constraint:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        json: error.json,
+        response: error.response
+      });
+
       let errorMessage = 'Failed to delete Constraint';
       if (error.json && error.json.message) {
         errorMessage = `Failed to delete Constraint: ${error.json.message}`;
