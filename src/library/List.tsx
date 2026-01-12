@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SectionBox, SimpleTable, Link, Loader } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Typography, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import yaml from 'js-yaml'; // Import js-yaml
 
 // Define a type for the structure of a library item (template)
@@ -150,6 +151,7 @@ const fetchLibraryTemplates = async (): Promise<LibraryTemplate[]> => {
 };
 
 function LibraryList() {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState<LibraryTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -183,15 +185,15 @@ function LibraryList() {
 
   if (loading) {
     return (
-      <SectionBox title="Gatekeeper Library">
-        <Loader title="Loading Gatekeeper Library..." />
+      <SectionBox title={t('Gatekeeper Library')}>
+        <Loader title={t('Loading Gatekeeper Library...')} />
       </SectionBox>
     );
   }
 
   if (error) {
     return (
-      <SectionBox title="Gatekeeper Library">
+      <SectionBox title={t('Gatekeeper Library')}>
         <Typography color="error">{error}</Typography>
       </SectionBox>
     );
@@ -199,26 +201,26 @@ function LibraryList() {
 
   if (templates.length === 0) {
     return (
-      <SectionBox title="Gatekeeper Library">
-        <Typography>No templates found in the library, or failed to load all of them.</Typography>
+      <SectionBox title={t('Gatekeeper Library')}>
+        <Typography>{t('No templates found in the library, or failed to load all of them.')}</Typography>
       </SectionBox>
     );
   }
 
   return (
-    <SectionBox title="Gatekeeper Library">
+    <SectionBox title={t('Gatekeeper Library')}>
       <Box mb={2}>
         <FormControl fullWidth sx={{ maxWidth: 300 }}>
-          <InputLabel id="category-filter-label">Filter by Category</InputLabel>
+          <InputLabel id="category-filter-label">{t('Filter by Category')}</InputLabel>
           <Select
             labelId="category-filter-label"
             id="category-filter-select"
             value={selectedCategory}
-            label="Filter by Category"
+            label={t('Filter by Category')}
             onChange={handleCategoryChange}
           >
             <MenuItem value="">
-              <em>All Categories</em>
+              <em>{t('All Categories')}</em>
             </MenuItem>
             {categories.map(category => (
               <MenuItem key={category} value={category}>
@@ -232,7 +234,7 @@ function LibraryList() {
         data={filteredTemplates}
         columns={[
           {
-            label: 'Name',
+            label: t('Name'),
             getter: item => {
               return (
                 <Link
@@ -246,11 +248,11 @@ function LibraryList() {
             },
           },
           {
-            label: 'Category',
+            label: t('Category'),
             getter: item => item.category,
           },
           {
-            label: 'Description',
+            label: t('Description'),
             getter: item => item.description,
           },
           // Remove the Source column

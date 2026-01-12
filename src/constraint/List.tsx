@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { RoutingPath } from '../index';
 import { ConstraintClass, ConstraintTemplateClass } from '../model';
 import { Constraint } from '../types';
@@ -29,6 +30,7 @@ import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 interface ConstraintListProps {}
 
 function ConstraintList({}: ConstraintListProps) {
+  const { t } = useTranslation();
   const [constraints, setConstraints] = useState<any[] | null>(null);
   const [kindFilter, setKindFilter] = useState<string>('All');
   const [enforcementActionFilter, setEnforcementActionFilter] = useState<string>('All');
@@ -124,19 +126,18 @@ function ConstraintList({}: ConstraintListProps) {
     };
 
     return (
-      <SectionBox title="Constraints">
+      <SectionBox title={t('Constraints')}>
         <Alert severity="warning" sx={{ margin: 2 }}>
-          <AlertTitle>Gatekeeper Not Found</AlertTitle>
+          <AlertTitle>{t('Gatekeeper Not Found')}</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and constraints.
+            {t('Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start using policy enforcement and constraints.')}
           </Typography>
           <Button
             variant="contained"
             color="primary"
             onClick={handleInstallGatekeeper}
           >
-            Install Gatekeeper
+            {t('Install Gatekeeper')}
           </Button>
         </Alert>
       </SectionBox>
@@ -147,7 +148,7 @@ function ConstraintList({}: ConstraintListProps) {
     console.log('⏳ [ConstraintList] Loading constraints...');
     return (
       <div>
-        <Typography>Loading constraints...</Typography>
+        <Typography>{t('Loading constraints...')}</Typography>
       </div>
     );
   }
@@ -181,14 +182,14 @@ function ConstraintList({}: ConstraintListProps) {
   }
 
   return (
-    <SectionBox title="Constraints">
+    <SectionBox title={t('Constraints')}>
       <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 150 }} size="small">
-          <InputLabel id="kind-filter-label">Kind</InputLabel>
+          <InputLabel id="kind-filter-label">{t('Kind')}</InputLabel>
           <Select
             labelId="kind-filter-label"
             value={kindFilter}
-            label="Kind"
+            label={t('Kind')}
             onChange={(e) => setKindFilter(e.target.value as string)}
           >
             {uniqueKinds.map(kind => (
@@ -197,11 +198,11 @@ function ConstraintList({}: ConstraintListProps) {
           </Select>
         </FormControl>
         <FormControl sx={{ minWidth: 200 }} size="small">
-          <InputLabel id="enforcement-action-filter-label">Enforcement Action</InputLabel>
+          <InputLabel id="enforcement-action-filter-label">{t('Enforcement Action')}</InputLabel>
           <Select
             labelId="enforcement-action-filter-label"
             value={enforcementActionFilter}
-            label="Enforcement Action"
+            label={t('Enforcement Action')}
             onChange={(e) => setEnforcementActionFilter(e.target.value as string)}
           >
             {uniqueEnforcementActions.map(action => (
@@ -212,18 +213,18 @@ function ConstraintList({}: ConstraintListProps) {
       </Box>
       {filteredConstraints.length === 0 ? (
         <Typography sx={{ padding: 2 }}>
-          {constraints.length > 0 ? 'No constraints match the current filters.' : 'No constraints found.'}
+          {constraints.length > 0 ? t('No constraints match the current filters.') : t('No constraints found.')}
         </Typography>
       ) : (
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Kind</TableCell>
-                <TableCell>Enforcement Action</TableCell>
-                <TableCell>Matched Kinds</TableCell>
-                <TableCell>Violations</TableCell>
-                <TableCell>Age</TableCell>
+                <TableCell>{t('Name')}</TableCell>
+                <TableCell>{t('Kind')}</TableCell>
+                <TableCell>{t('Enforcement Action')}</TableCell>
+                <TableCell>{t('Matched Kinds')}</TableCell>
+                <TableCell>{t('Violations')}</TableCell>
+                <TableCell>{t('Age')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

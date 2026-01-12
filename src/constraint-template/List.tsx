@@ -21,6 +21,7 @@ import {
   AlertTitle,
 } from '@mui/material';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useHistory, useLocation } from 'react-router-dom';
 import { RoutingPath } from '../index';
 import { ConstraintTemplateClass } from '../model';
@@ -30,6 +31,7 @@ import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 interface ConstraintTemplateListProps {}
 
 function ConstraintTemplateList({}: ConstraintTemplateListProps) {
+  const { t } = useTranslation();
   const [constraintTemplates, setConstraintTemplates] = useState<KubeObject[] | null>(null);
   const [selectedTargetFilter, setSelectedTargetFilter] = useState<string>('');
   const [gatekeeperNotInstalled, setGatekeeperNotInstalled] = useState(false);
@@ -106,19 +108,18 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
     };
 
     return (
-      <SectionBox title="Constraint Templates">
+      <SectionBox title={t('Constraint Templates')}>
         <Alert severity="warning" sx={{ margin: 2 }}>
-          <AlertTitle>Gatekeeper Not Found</AlertTitle>
+          <AlertTitle>{t('Gatekeeper Not Found')}</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and constraint templates.
+            {t('Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start using policy enforcement and constraint templates.')}
           </Typography>
           <Button
             variant="contained"
             color="primary"
             onClick={handleInstallGatekeeper}
           >
-            Install Gatekeeper
+            {t('Install Gatekeeper')}
           </Button>
         </Alert>
       </SectionBox>
@@ -127,7 +128,7 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
 
   // Show loading state while waiting for data
   if (!constraintTemplates) {
-    return <Typography>Loading constraint templates...</Typography>;
+    return <Typography>{t('Loading constraint templates...')}</Typography>;
   }
 
   const templates = constraintTemplates
@@ -140,9 +141,9 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
   function makeStatusLabel(item: ConstraintTemplate) {
     const status = item.status;
     if (!status) {
-      return 'Unknown';
+      return t('Unknown');
     }
-    return status.created ? 'Ready' : 'Not Ready';
+    return status.created ? t('Ready') : t('Not Ready');
   }
 
   function getTargets(item: ConstraintTemplate) {
@@ -150,20 +151,20 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
   }
 
   return (
-    <SectionBox title="Constraint Templates">
+    <SectionBox title={t('Constraint Templates')}>
       <Box sx={{ marginBottom: 2, maxWidth: 300 }}>
         <FormControl fullWidth size="small">
-          <InputLabel id="target-filter-label">Filter by Target</InputLabel>
+          <InputLabel id="target-filter-label">{t('Filter by Target')}</InputLabel>
           <Select
             labelId="target-filter-label"
             id="target-filter-select"
             value={selectedTargetFilter}
-            label="Filter by Target"
+            label={t('Filter by Target')}
             onChange={handleTargetFilterChange}
           >
             {uniqueTargets.map(target => (
               <MenuItem key={target || 'all'} value={target}>
-                {target || 'All Targets'}
+                {target || t('All Targets')}
               </MenuItem>
             ))}
           </Select>
@@ -171,19 +172,19 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
       </Box>
       {templates.length === 0 && constraintTemplates.length > 0 ? (
         <Typography sx={{ padding: 2 }}>
-          No constraint templates found for the selected target.
+          {t('No constraint templates found for the selected target.')}
         </Typography>
       ) : templates.length === 0 && constraintTemplates.length === 0 ? (
-        <Typography sx={{ padding: 2 }}>No constraint templates found.</Typography>
+        <Typography sx={{ padding: 2 }}>{t('No constraint templates found.')}</Typography>
       ) : (
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Kind</TableCell>
-                  <TableCell>Targets</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Age</TableCell>
+                  <TableCell>{t('Name')}</TableCell>
+                  <TableCell>{t('Kind')}</TableCell>
+                  <TableCell>{t('Targets')}</TableCell>
+                  <TableCell>{t('Status')}</TableCell>
+                  <TableCell>{t('Age')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

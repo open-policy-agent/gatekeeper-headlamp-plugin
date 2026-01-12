@@ -17,6 +17,7 @@ import {
 import {
   KubeObjectInterface,
 } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
+import { useTranslation } from 'react-i18next';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import yaml from 'js-yaml';
 
@@ -84,6 +85,7 @@ async function checkCRDEstablished(crdName: string): Promise<boolean> {
 }
 
 function LibraryTemplateDetails() {
+  const { t } = useTranslation();
   const { id: templateRouteId } = useParams<{ id: string }>();
   const location = useLocation();
   const state = location.state as { template: LibraryTemplateFromState }; // Type assertion for state
@@ -216,11 +218,11 @@ function LibraryTemplateDetails() {
 
   const handleGenerateConstraint = () => {
     if (!parsedTemplate) {
-      setError('Cannot generate constraint: ConstraintTemplate not parsed.');
+      setError(t('Cannot generate constraint: ConstraintTemplate not parsed.'));
       return;
     }
     if (!constraintName.trim()) {
-      setError('Constraint Name is required.');
+      setError(t('Constraint Name is required.'));
       return;
     }
 
@@ -228,7 +230,7 @@ function LibraryTemplateDetails() {
     try {
       paramsObj = JSON.parse(constraintParams);
     } catch (e: any) {
-      setError(`Invalid JSON in parameters: ${e.message}`);
+      setError(t('Invalid JSON in parameters: {{message}}', { message: e.message }));
       setGeneratedConstraintYAML(null);
       return;
     }
@@ -237,7 +239,7 @@ function LibraryTemplateDetails() {
     try {
       matchObj = JSON.parse(matchCriteria);
     } catch (e: any) {
-      setError(`Invalid JSON in match criteria: ${e.message}`);
+      setError(t('Invalid JSON in match criteria: {{message}}', { message: e.message }));
       setGeneratedConstraintYAML(null);
       return;
     }
@@ -259,14 +261,14 @@ function LibraryTemplateDetails() {
       setGeneratedConstraintYAML(yamlOutput);
       setError(null); // Clear previous errors
     } catch (e: any) {
-      setError(`Failed to generate Constraint YAML: ${e.message}`);
+      setError(t('Failed to generate Constraint YAML: {{message}}', { message: e.message }));
       setGeneratedConstraintYAML(null);
     }
   };
 
   const handleApplyTemplateAndConstraint = async () => {
     if (!libraryTemplateItem?.rawYAML || !generatedConstraintYAML || !parsedTemplate) {
-      setSnackbarState({ open: true, message: 'Missing template YAML or generated constraint YAML.', severity: 'error' });
+      setSnackbarState({ open: true, message: t('Missing template YAML or generated constraint YAML.'), severity: 'error' });
       return;
     }
 
@@ -317,7 +319,7 @@ function LibraryTemplateDetails() {
       } catch (ctError: any) {
         if (ctError.status === 409) { // HTTP 409 Conflict
           console.warn(`ConstraintTemplate ${templateObjToApply.metadata.name} already exists. Proceeding to CRD check and Constraint application.`);
-          successMessage = `ConstraintTemplate ${templateObjToApply.metadata.name} already exists. Checking CRD...`;
+          successMessage = t('ConstraintTemplate {{name}} already exists. Checking CRD...', { name: templateObjToApply.metadata.name });
           setSnackbarState({ open: true, message: successMessage, severity: 'warning' });
         } else {
           throw ctError; // Re-throw other errors
@@ -338,9 +340,9 @@ function LibraryTemplateDetails() {
       }
 
       if (!crdEstablished) {
-        throw new Error(`CRD ${crdName} was not established within ${CRD_ESTABLISHED_TIMEOUT_MS / 1000} seconds.`);
+        throw new Error(t('CRD {{crdName}} was not established within {{seconds}} seconds.', { crdName, seconds: CRD_ESTABLISHED_TIMEOUT_MS / 1000 }));
       }
-      successMessage = `ConstraintTemplate applied & CRD ${crdName} established. Applying constraint...`;
+      successMessage = t('ConstraintTemplate applied & CRD {{crdName}} established. Applying constraint...', { crdName });
       setSnackbarState({ open: true, message: successMessage, severity: 'info' });
 
       // 3. Apply Constraint
@@ -367,15 +369,15 @@ function LibraryTemplateDetails() {
           headers: { 'Content-Type': 'application/json' },
         }
       );
-      successMessage = "ConstraintTemplate and Constraint applied successfully!";
+      successMessage = t('ConstraintTemplate and Constraint applied successfully!');
       setSnackbarState({ open: true, message: successMessage, severity: 'success' });
 
     } catch (err: any) {
-      let errorMessage = err.message || 'Unknown error';
+      let errorMessage = err.message || t('Unknown error');
       if (err.json && err.json.message) {
         errorMessage = err.json.message;
       }
-      setSnackbarState({ open: true, message: `Failed to apply: ${errorMessage}`, severity: 'error' });
+      setSnackbarState({ open: true, message: t('Failed to apply: {{errorMessage}}', { errorMessage }), severity: 'error' });
     } finally {
       setApplying(false);
     }
@@ -396,9 +398,9 @@ function LibraryTemplateDetails() {
     return (
       <Box sx={{ p: 2 }}>
         <Typography variant="h5" gutterBottom>
-          Library Template Details
+          {t('Library Template Details')}
         </Typography>
-        <Typography color="error">{error || "Could not load template details."}</Typography>
+        <Typography color="error">{error || t('Could not load template details.')}</Typography>
       </Box>
     );
   }
@@ -406,11 +408,11 @@ function LibraryTemplateDetails() {
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h5" gutterBottom>
-              Library Template: {libraryTemplateItem.name}
+        {t('Library Template: {{name}}', { name: libraryTemplateItem.name })}
       </Typography>
-      {error && !parsedTemplate && <Typography color="error" gutterBottom>Error: {error}</Typography>}
+      {error && !parsedTemplate && <Typography color="error" gutterBottom>{t('Error: {{error}}', { error })}</Typography>}
 
-      <SectionBox title="ConstraintTemplate Definition">
+      <SectionBox title={t('ConstraintTemplate Definition')}>
         <Paper elevation={2} sx={{ p: 1, overflowX: 'auto' }}>
           <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
             {libraryTemplateItem.rawYAML}
@@ -419,25 +421,25 @@ function LibraryTemplateDetails() {
       </SectionBox>
 
       {parsedTemplate && (
-        <SectionBox title="Create Constraint from this Template" sx={{ mt: 2 }}>
+        <SectionBox title={t('Create Constraint from this Template')} sx={{ mt: 2 }}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
-              Constraint Details (Kind: {parsedTemplate.spec.crd.spec.names.kind})
+              {t('Constraint Details (Kind: {{kind}})', { kind: parsedTemplate.spec.crd.spec.names.kind })}
             </Typography>
             <TextField
-              label="Constraint Name"
+              label={t('Constraint Name')}
               value={constraintName}
               onChange={(e) => setConstraintName(e.target.value)}
               fullWidth
               margin="normal"
               required
               error={!constraintName.trim()}
-              helperText={!constraintName.trim() ? "Constraint name is required." : ""}
+              helperText={!constraintName.trim() ? t('Constraint name is required.') : ''}
             />
 
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 0.5 }}>Match Criteria (JSON):</Typography>
+            <Typography variant="subtitle1" sx={{ mt: 2, mb: 0.5 }}>{t('Match Criteria (JSON):')}</Typography>
             <TextField
-              label="Match Criteria (JSON format)"
+              label={t('Match Criteria (JSON format)')}
               value={matchCriteria}
               onChange={(e) => setMatchCriteria(e.target.value)}
               multiline
@@ -450,11 +452,11 @@ function LibraryTemplateDetails() {
               }}
             />
 
-            <Typography variant="subtitle1" sx={{ mt: 1, mb: 0.5 }}>Parameters (JSON):</Typography>
+            <Typography variant="subtitle1" sx={{ mt: 1, mb: 0.5 }}>{t('Parameters (JSON):')}</Typography>
             {parsedTemplate.spec.crd.spec.validation?.openAPIV3Schema?.properties && (
               <Box mb={1}>
                 <TextField
-                  label="Parameters (JSON format)"
+                  label={t('Parameters (JSON format)')}
                   value={constraintParams}
                   onChange={(e) => setConstraintParams(e.target.value)}
                   multiline
@@ -476,14 +478,14 @@ function LibraryTemplateDetails() {
               sx={{ mt: 2, mr: 1 }}
               disabled={!constraintName || !constraintParams || !matchCriteria || !parsedTemplate}
             >
-              Preview Constraint YAML
+              {t('Preview Constraint YAML')}
             </Button>
           </Paper>
         </SectionBox>
       )}
 
       {generatedConstraintYAML && (
-        <SectionBox title="Generated Constraint YAML" sx={{ mt: 2 }}>
+        <SectionBox title={t('Generated Constraint YAML')} sx={{ mt: 2 }}>
           <Paper elevation={2} sx={{ p: 1, overflowX: 'auto' }}>
             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {generatedConstraintYAML}
@@ -501,7 +503,7 @@ function LibraryTemplateDetails() {
             disabled={applying || !libraryTemplateItem.rawYAML || (parsedTemplate && !generatedConstraintYAML)}
             startIcon={applying ? <CircularProgress size={20} /> : null}
           >
-            {applying ? 'Applying...' : 'Apply Template & Constraint to Cluster'}
+            {applying ? t('Applying...') : t('Apply Template & Constraint to Cluster')}
           </Button>
         </Box>
       )}

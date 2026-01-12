@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import React, { useState } from 'react';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ConstraintClass } from '../model';
 import { Constraint } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
@@ -30,6 +31,7 @@ import { RoutingPath } from '../index';
 interface ConstraintDetailsProps {}
 
 function ConstraintDetails({}: ConstraintDetailsProps) {
+  const { t } = useTranslation();
   const { kind, name } = useParams<{ kind: string; name: string }>();
   const [item, setItem] = useState<any | null>(null);
   const history = useHistory();
@@ -51,7 +53,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   ConstraintClass.useApiGet(setItem, name);
 
   if (!item) {
-    return <Typography>Loading constraint details...</Typography>;
+    return <Typography>{t('Loading constraint details...')}</Typography>;
   }
 
   // Handle both KubeObject instances and raw constraint objects
@@ -75,7 +77,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       console.error('Cannot delete: name or constraint is missing', { name, constraint });
       setSnackbarState({
         open: true,
-        message: 'Cannot delete: missing constraint information',
+        message: t('Cannot delete: missing constraint information'),
         severity: 'error',
       });
       return;
@@ -151,7 +153,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       console.log('Delete request successful');
       setSnackbarState({
         open: true,
-        message: `Constraint "${name}" deleted successfully`,
+        message: t('Constraint "{{name}}" deleted successfully', { name }),
         severity: 'success',
       });
 
@@ -177,11 +179,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         response: error.response
       });
 
-      let errorMessage = 'Failed to delete Constraint';
+      let errorMessage = t('Failed to delete Constraint');
       if (error.json && error.json.message) {
-        errorMessage = `Failed to delete Constraint: ${error.json.message}`;
+        errorMessage = t('Failed to delete Constraint: {{message}}', { message: error.json.message });
       } else if (error.message) {
-        errorMessage = `Failed to delete Constraint: ${error.message}`;
+        errorMessage = t('Failed to delete Constraint: {{message}}', { message: error.message });
       }
 
       setSnackbarState({
@@ -211,28 +213,28 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
     return [
       {
-        name: 'Name',
+        name: t('Name'),
         value: constraint.metadata.name,
       },
       {
-        name: 'Kind',
+        name: t('Kind'),
         value: constraint.kind,
       },
       {
-        name: 'Created',
+        name: t('Created'),
         value: constraint.metadata.creationTimestamp,
       },
       {
-        name: 'Enforcement Action',
+        name: t('Enforcement Action'),
         value: <Chip label={action} color={actionColor} size="small" />,
       },
       {
-        name: 'Total Violations',
+        name: t('Total Violations'),
         value: constraint.status?.totalViolations?.toString() || '0',
       },
       {
-        name: 'Last Audit',
-        value: constraint.status?.auditTimestamp || 'Never',
+        name: t('Last Audit'),
+        value: constraint.status?.auditTimestamp || t('Never'),
       },
     ];
   }
@@ -248,12 +250,12 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
     if (match.kinds) {
       match.kinds.forEach((kindRule, index) => {
         rules.push({
-          Property: 'API Groups',
+          Property: t('API Groups'),
           Value: kindRule.apiGroups.join(', '),
           Index: `kinds-${index}-apiGroups`,
         });
         rules.push({
-          Property: 'Kinds',
+          Property: t('Kinds'),
           Value: kindRule.kinds.join(', '),
           Index: `kinds-${index}-kinds`,
         });
@@ -262,7 +264,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
     if (match.excludedNamespaces) {
       rules.push({
-        Property: 'Excluded Namespaces',
+        Property: t('Excluded Namespaces'),
         Value: match.excludedNamespaces.join(', '),
         Index: 'excludedNamespaces',
       });
@@ -278,7 +280,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
     return constraint.status.violations.map((violation, index) => ({
       Resource: `${violation.kind}/${violation.name}`,
-      Namespace: violation.namespace || 'cluster-scoped',
+      Namespace: violation.namespace || t('cluster-scoped'),
       Message: violation.message,
       Index: index,
     }));
@@ -293,7 +295,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             {constraint.metadata.name}
           </Typography>
           <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-            {constraint.kind} Constraint
+            {t('{{kind}} Constraint', { kind: constraint.kind })}
           </Typography>
         </Box>
         <Button
@@ -304,11 +306,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
           startIcon={isDeleting ? <CircularProgress size={20} /> : null}
           sx={{ height: 'fit-content' }}
         >
-          {isDeleting ? 'Deleting...' : 'Delete'}
+          {isDeleting ? t('Deleting...') : t('Delete')}
         </Button>
       </Box>
 
-      <SectionBox title="Overview">
+      <SectionBox title={t('Overview')}>
         <Table>
           <TableBody>
             {getMainInfoRows().map((row) => (
@@ -323,12 +325,12 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         </Table>
       </SectionBox>
 
-      <SectionBox title="Match Rules">
+      <SectionBox title={t('Match Rules')}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Property</TableCell>
-              <TableCell>Value</TableCell>
+              <TableCell>{t('Property')}</TableCell>
+              <TableCell>{t('Value')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -342,13 +344,13 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         </Table>
       </SectionBox>
 
-      <SectionBox title={`Violations (${constraint.status?.totalViolations || 0})`}>
+      <SectionBox title={t('Violations ({{count}})', { count: constraint.status?.totalViolations || 0 })}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Resource</TableCell>
-              <TableCell>Namespace</TableCell>
-              <TableCell>Message</TableCell>
+              <TableCell>{t('Resource')}</TableCell>
+              <TableCell>{t('Namespace')}</TableCell>
+              <TableCell>{t('Message')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -371,20 +373,19 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         aria-describedby="delete-dialog-description"
       >
         <DialogTitle id="delete-dialog-title">
-          Delete Constraint
+          {t('Delete Constraint')}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete the {constraint.kind} constraint "{constraint.metadata.name}"?
-            This action cannot be undone.
+            {t('Are you sure you want to delete the {{kind}} constraint "{{name}}"? This action cannot be undone.', { kind: constraint.kind, name: constraint.metadata.name })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel} color="primary">
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Delete
+            {t('Delete')}
           </Button>
         </DialogActions>
       </Dialog>
