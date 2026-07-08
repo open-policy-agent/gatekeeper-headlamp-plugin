@@ -39,7 +39,7 @@
 # -----------------
 # Currently configured for macOS. For other platforms, update HEADLAMP_PLUGINS_DIR:
 # Linux:   HEADLAMP_PLUGINS_DIR = $(HOME)/.config/Headlamp/plugins
-# Windows: HEADLAMP_PLUGINS_DIR = $(APPDATA)/Headlamp/plugins
+# Windows: HEADLAMP_PLUGINS_DIR = $(APPDATA)/Headlamp/Config/plugins
 #
 # DEPENDENCIES:
 # ------------
