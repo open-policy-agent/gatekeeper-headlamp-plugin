@@ -13,7 +13,8 @@
     "test": "headlamp-plugin test",
     "tsc": "headlamp-plugin tsc",
     "extract": "headlamp-plugin extract . .plugins",
-    "test:dynamic-constraints": "node --experimental-vm-modules ./test/test-dynamic-constraints.js"
+    "test:dynamic-constraints": "node --experimental-vm-modules ./test/test-dynamic-constraints.js",
+    "i18n": "headlamp-plugin i18n"
   },
   "keywords": [
     "headlamp",
@@ -25,6 +26,22 @@
   ],
   "author": "Sertac Ozercan",
   "license": "Apache-2.0",
+  "headlamp": {
+    "i18n": [
+      "en",
+      "de",
+      "es",
+      "fr",
+      "hi",
+      "it",
+      "ja",
+      "ko",
+      "pt",
+      "ta",
+      "zh",
+      "zh-tw"
+    ]
+  },
   "prettier": "@headlamp-k8s/eslint-config/prettier-config",
   "eslintConfig": {
     "extends": [
@@ -34,7 +51,7 @@
     ]
   },
   "devDependencies": {
-    "@kinvolk/headlamp-plugin": "^0.12.0",
+    "@kinvolk/headlamp-plugin": "^0.13.0",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",

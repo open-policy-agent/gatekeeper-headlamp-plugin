@@ -14,18 +14,20 @@ import {
   Typography} from '@mui/material';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ConstraintClass } from '../model';
 
 interface ViolationsDetailsProps {}
 
 function ViolationsDetails({}: ViolationsDetailsProps) {
+  const { t } = useTranslation();
   const { name } = useParams<{ kind: string; name: string }>();
   const [constraint, setConstraint] = useState<any>(null);
 
   ConstraintClass.useApiGet(setConstraint, name);
 
   if (!constraint) {
-    return <Loader title="Loading violation details" />;
+    return <Loader title={t('Loading violation details')} />;
   }
 
   function getConstraintInfoRows() {
@@ -40,7 +42,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
 
     return [
       {
-        name: 'Constraint Name',
+        name: t('Constraint Name'),
         value: (
           <Link
             routeName="gatekeeper/constraints/:kind/:name"
@@ -54,20 +56,20 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
         ),
       },
       {
-        name: 'Constraint Kind',
+        name: t('Constraint Kind'),
         value: constraint.kind,
       },
       {
-        name: 'Enforcement Action',
+        name: t('Enforcement Action'),
         value: <Chip label={action} color={actionColor} size="small" />,
       },
       {
-        name: 'Total Violations',
+        name: t('Total Violations'),
         value: constraint.status?.totalViolations?.toString() || '0',
       },
       {
-        name: 'Last Audit',
-        value: constraint.status?.auditTimestamp || 'Never',
+        name: t('Last Audit'),
+        value: constraint.status?.auditTimestamp || t('Never'),
       },
     ];
   }
@@ -79,7 +81,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
 
     return constraint.status.violations.map((violation: any, index: number) => ({
       Resource: `${violation.kind}/${violation.name}`,
-      Namespace: violation.namespace || 'cluster-scoped',
+      Namespace: violation.namespace || t('cluster-scoped'),
       'API Version': violation.apiVersion,
       Message: violation.message,
       Index: index,
@@ -97,12 +99,12 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
     if (match.kinds) {
       match.kinds.forEach((kindRule: any, index: number) => {
         rules.push({
-          Property: 'API Groups',
+          Property: t('API Groups'),
           Value: kindRule.apiGroups.join(', '),
           Index: `kinds-${index}-apiGroups`,
         });
         rules.push({
-          Property: 'Kinds',
+          Property: t('Kinds'),
           Value: kindRule.kinds.join(', '),
           Index: `kinds-${index}-kinds`,
         });
@@ -111,7 +113,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
 
     if (match.excludedNamespaces) {
       rules.push({
-        Property: 'Excluded Namespaces',
+        Property: t('Excluded Namespaces'),
         Value: match.excludedNamespaces.join(', '),
         Index: 'excludedNamespaces',
       });
@@ -123,13 +125,13 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
-        Violations for {constraint.metadata.name}
+        {t('Violations for {{name}}', { name: constraint.metadata.name })}
       </Typography>
       <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-        {constraint.kind} Constraint Violations
+        {t('{{kind}} Constraint Violations', { kind: constraint.kind })}
       </Typography>
 
-      <SectionBox title="Constraint Details">
+      <SectionBox title={t('Constraint Details')}>
         <Table>
           <TableBody>
             {getConstraintInfoRows().map((row) => (
@@ -144,40 +146,40 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
         </Table>
       </SectionBox>
 
-      <SectionBox title="Match Rules">
+      <SectionBox title={t('Match Rules')}>
         <SimpleTable
           data={getMatchRules()}
           columns={[
             {
-              label: 'Property',
+              label: t('Property'),
               getter: (row: any) => row.Property,
             },
             {
-              label: 'Value',
+              label: t('Value'),
               getter: (row: any) => row.Value,
             },
           ]}
         />
       </SectionBox>
 
-      <SectionBox title={`Violations (${constraint.status?.totalViolations || 0})`}>
+      <SectionBox title={t('Violations ({{count}})', { count: constraint.status?.totalViolations || 0 })}>
         <SimpleTable
           data={getViolationRows()}
           columns={[
             {
-              label: 'Resource',
+              label: t('Resource'),
               getter: (row: any) => row.Resource,
             },
             {
-              label: 'Namespace',
+              label: t('Namespace'),
               getter: (row: any) => row.Namespace,
             },
             {
-              label: 'API Version',
+              label: t('API Version'),
               getter: (row: any) => row['API Version'],
             },
             {
-              label: 'Message',
+              label: t('Message'),
               getter: (row: any) => row.Message,
             },
           ]}

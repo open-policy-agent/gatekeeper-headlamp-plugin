@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import React, { useState, useMemo, useEffect } from 'react'; // Added useMemo, useEffect
 import { useHistory, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ConstraintClass } from '../model';
 import { Constraint, Violation } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
@@ -38,6 +39,7 @@ interface ViolationWithConstraint extends Violation {
 }
 
 function ViolationsList({}: ViolationsListProps) {
+  const { t } = useTranslation();
   const [constraintObjects, setConstraintObjects] = useState<any[] | null>(null);
   // Filter states
   const [resourceKindFilter, setResourceKindFilter] = useState<string>('All');
@@ -191,19 +193,18 @@ function ViolationsList({}: ViolationsListProps) {
     };
 
     return (
-      <SectionBox title="Violations">
+      <SectionBox title={t('Violations')}>
         <Alert severity="warning" sx={{ margin: 2 }}>
-          <AlertTitle>Gatekeeper Not Found</AlertTitle>
+          <AlertTitle>{t('Gatekeeper Not Found')}</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and track violations.
+            {t('Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start using policy enforcement and track violations.')}
           </Typography>
           <Button
             variant="contained"
             color="primary"
             onClick={handleInstallGatekeeper}
           >
-            Install Gatekeeper
+            {t('Install Gatekeeper')}
           </Button>
         </Alert>
       </SectionBox>
@@ -211,18 +212,18 @@ function ViolationsList({}: ViolationsListProps) {
   }
 
   return (
-    <SectionBox title="Violations">
+    <SectionBox title={t('Violations')}>
       {!constraintObjects ? (
-        <Loader title="Loading violations..." />
+        <Loader title={t('Loading violations...')} />
       ) : (
           <>
             <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="resource-kind-filter-label">Resource Kind</InputLabel>
+                <InputLabel id="resource-kind-filter-label">{t('Resource Kind')}</InputLabel>
                 <Select
                   labelId="resource-kind-filter-label"
                   value={resourceKindFilter}
-                  label="Resource Kind"
+                  label={t('Resource Kind')}
                   onChange={(e) => setResourceKindFilter(e.target.value as string)}
                 >
                   {uniqueResourceKinds.map(kind => (
@@ -231,11 +232,11 @@ function ViolationsList({}: ViolationsListProps) {
                 </Select>
               </FormControl>
               <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="constraint-kind-filter-label">Constraint Kind</InputLabel>
+                <InputLabel id="constraint-kind-filter-label">{t('Constraint Kind')}</InputLabel>
                 <Select
                   labelId="constraint-kind-filter-label"
                   value={constraintKindFilter}
-                  label="Constraint Kind"
+                  label={t('Constraint Kind')}
                   onChange={(e) => setConstraintKindFilter(e.target.value as string)}
                 >
                   {uniqueConstraintKinds.map(kind => (
@@ -244,11 +245,11 @@ function ViolationsList({}: ViolationsListProps) {
                 </Select>
               </FormControl>
               <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="enforcement-action-filter-label">Enforcement Action</InputLabel>
+                <InputLabel id="enforcement-action-filter-label">{t('Enforcement Action')}</InputLabel>
                 <Select
                   labelId="enforcement-action-filter-label"
                   value={enforcementActionFilter}
-                  label="Enforcement Action"
+                  label={t('Enforcement Action')}
                   onChange={(e) => setEnforcementActionFilter(e.target.value as string)}
                 >
                   {uniqueEnforcementActions.map(action => (
@@ -257,7 +258,7 @@ function ViolationsList({}: ViolationsListProps) {
                 </Select>
               </FormControl>
               <TextField
-                label="Resource Name (ns/name or name)"
+                label={t('Resource Name (ns/name or name)')}
                 variant="outlined"
                 size="small"
                 value={resourceNameFilter}
@@ -266,26 +267,26 @@ function ViolationsList({}: ViolationsListProps) {
               />
             </Box>
             {violations.length === 0 && constraintObjects.length > 0 && (
-              <Typography sx={{ padding: 2 }}>No violations found across {constraintObjects.length} constraints.</Typography>
+              <Typography sx={{ padding: 2 }}>{t('No violations found across {{count}} constraints.', { count: constraintObjects.length })}</Typography>
             )}
             {/* Update empty messages based on filters */}
             {violations.length > 0 && filteredViolations.length === 0 && (
-                <Typography sx={{ padding: 2 }}>No violations match the current filters.</Typography>
+                <Typography sx={{ padding: 2 }}>{t('No violations match the current filters.')}</Typography>
             )}
             {constraintObjects.length === 0 && violations.length === 0 && (
-              <Typography sx={{ padding: 2 }}>No violations found.</Typography>
+              <Typography sx={{ padding: 2 }}>{t('No violations found.')}</Typography>
             )}
             {filteredViolations.length > 0 && (
               <TableContainer component={Paper}>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Resource</TableCell>
-                      <TableCell>Kind</TableCell>
-                      <TableCell>Constraint</TableCell>
-                      <TableCell>Constraint Kind</TableCell>
-                      <TableCell>Enforcement</TableCell>
-                      <TableCell>Message</TableCell>
+                      <TableCell>{t('Resource')}</TableCell>
+                      <TableCell>{t('Kind')}</TableCell>
+                      <TableCell>{t('Constraint')}</TableCell>
+                      <TableCell>{t('Constraint Kind')}</TableCell>
+                      <TableCell>{t('Enforcement')}</TableCell>
+                      <TableCell>{t('Message')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>

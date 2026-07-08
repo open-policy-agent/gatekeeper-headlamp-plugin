@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import React, { useState } from 'react';
 import { useParams, useHistory, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ConstraintTemplateClass } from '../model';
 import { ConstraintTemplate } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
@@ -30,6 +31,7 @@ import { RoutingPath } from '../index';
 interface ConstraintTemplateDetailsProps {}
 
 function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
+  const { t } = useTranslation();
   const { name } = useParams<{ name: string }>();
   const [item, setItem] = useState<KubeObject | null>(null);
   const history = useHistory();
@@ -51,7 +53,7 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
   ConstraintTemplateClass.useApiGet(setItem, name);
 
   if (!item) {
-    return <Typography>Loading constraint template details...</Typography>;
+    return <Typography>{t('Loading constraint template details...')}</Typography>;
   }
 
   const constraintTemplate = item.jsonData as ConstraintTemplate;
@@ -80,7 +82,7 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
 
       setSnackbarState({
         open: true,
-        message: `ConstraintTemplate "${name}" deleted successfully`,
+        message: t('ConstraintTemplate "{{name}}" deleted successfully', { name }),
         severity: 'success',
       });
 
@@ -98,11 +100,11 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
       }, 1500);
 
     } catch (error: any) {
-      let errorMessage = 'Failed to delete ConstraintTemplate';
+      let errorMessage = t('Failed to delete ConstraintTemplate');
       if (error.json && error.json.message) {
-        errorMessage = `Failed to delete ConstraintTemplate: ${error.json.message}`;
+        errorMessage = t('Failed to delete ConstraintTemplate: {{message}}', { message: error.json.message });
       } else if (error.message) {
-        errorMessage = `Failed to delete ConstraintTemplate: ${error.message}`;
+        errorMessage = t('Failed to delete ConstraintTemplate: {{message}}', { message: error.message });
       }
 
       setSnackbarState({
@@ -125,24 +127,24 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
   function getMainInfoRows() {
     return [
       {
-        name: 'Name',
+        name: t('Name'),
         value: constraintTemplate.metadata.name,
       },
       {
-        name: 'Created',
+        name: t('Created'),
         value: constraintTemplate.metadata.creationTimestamp,
       },
       {
-        name: 'Kind',
+        name: t('Kind'),
         value: constraintTemplate.spec?.crd?.spec?.names?.kind || '',
       },
       {
-        name: 'Plural',
+        name: t('Plural'),
         value: constraintTemplate.spec?.crd?.spec?.names?.plural || '',
       },
       {
-        name: 'Status',
-        value: constraintTemplate.status?.created ? 'Ready' : 'Not Ready',
+        name: t('Status'),
+        value: constraintTemplate.status?.created ? t('Ready') : t('Not Ready'),
       },
     ];
   }
@@ -154,8 +156,8 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
 
     return constraintTemplate.spec.targets.map((target) => ({
       Target: target.target,
-      'Has Rego': target.rego ? 'Yes' : 'No',
-      'Has Libs': target.libs && target.libs.length > 0 ? 'Yes' : 'No',
+      'Has Rego': target.rego ? t('Yes') : t('No'),
+      'Has Libs': target.libs && target.libs.length > 0 ? t('Yes') : t('No'),
     }));
   }
 
@@ -168,7 +170,7 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
             {constraintTemplate.metadata.name}
           </Typography>
           <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-            Constraint Template
+            {t('Constraint Template')}
           </Typography>
         </Box>
         <Button
@@ -179,11 +181,11 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
           startIcon={isDeleting ? <CircularProgress size={20} /> : null}
           sx={{ height: 'fit-content' }}
         >
-          {isDeleting ? 'Deleting...' : 'Delete'}
+          {isDeleting ? t('Deleting...') : t('Delete')}
         </Button>
       </Box>
 
-      <SectionBox title="Overview">
+      <SectionBox title={t('Overview')}>
         <Table>
           <TableBody>
             {getMainInfoRows().map((row) => (
@@ -198,13 +200,13 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
         </Table>
       </SectionBox>
 
-      <SectionBox title="Targets">
+      <SectionBox title={t('Targets')}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Target</TableCell>
-              <TableCell>Has Rego</TableCell>
-              <TableCell>Has Libs</TableCell>
+              <TableCell>{t('Target')}</TableCell>
+              <TableCell>{t('Has Rego')}</TableCell>
+              <TableCell>{t('Has Libs')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -227,20 +229,19 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
         aria-describedby="delete-dialog-description"
       >
         <DialogTitle id="delete-dialog-title">
-          Delete ConstraintTemplate
+          {t('Delete ConstraintTemplate')}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete the ConstraintTemplate "{constraintTemplate.metadata.name}"?
-            This action cannot be undone and may affect any constraints using this template.
+            {t('Are you sure you want to delete the ConstraintTemplate "{{name}}"? This action cannot be undone and may affect any constraints using this template.', { name: constraintTemplate.metadata.name })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel} color="primary">
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Delete
+            {t('Delete')}
           </Button>
         </DialogActions>
       </Dialog>
