@@ -48,7 +48,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
     severity: 'info',
   });
 
-  ConstraintClass.useApiGet(setItem, name);
+  ConstraintClass.useApiGet(setItem, name, kind);
 
   if (!item) {
     return <Typography>Loading constraint details...</Typography>;
@@ -285,7 +285,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   }
 
   return (
-    <Box>
+    <Box sx={{ pt: 2, pb: 2 }}>
       {/* Header with title and delete button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>

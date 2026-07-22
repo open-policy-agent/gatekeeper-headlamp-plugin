@@ -2,16 +2,12 @@ import {
   Link,
   Loader,
   SectionBox,
+  SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
   Chip,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
   Typography,
   Box, // Added Box
   Select, // Added Select
@@ -25,11 +21,12 @@ import {
 } from '@mui/material';
 import React, { useState, useMemo, useEffect } from 'react'; // Added useMemo, useEffect
 import { useHistory, useLocation } from 'react-router-dom';
+import { RoutingPath } from '../index';
 import { ConstraintClass } from '../model';
 import { Constraint, Violation } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ViolationsListProps {}
+interface ViolationsListProps { hideTitle?: boolean; }
 
 interface ViolationWithConstraint extends Violation {
   constraintName: string;
@@ -37,7 +34,7 @@ interface ViolationWithConstraint extends Violation {
   enforcementAction: string;
 }
 
-function ViolationsList({}: ViolationsListProps) {
+function ViolationsList(props: ViolationsListProps) {
   const [constraintObjects, setConstraintObjects] = useState<any[] | null>(null);
   // Filter states
   const [resourceKindFilter, setResourceKindFilter] = useState<string>('All');
@@ -191,7 +188,7 @@ function ViolationsList({}: ViolationsListProps) {
     };
 
     return (
-      <SectionBox title="Violations">
+      <SectionBox title={props.hideTitle ? undefined : "Violations"}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
@@ -211,9 +208,9 @@ function ViolationsList({}: ViolationsListProps) {
   }
 
   return (
-    <SectionBox title="Violations">
+    <SectionBox title={props.hideTitle ? undefined : "Violations"}>
       {!constraintObjects ? (
-        <Loader title="Loading violations..." />
+        <Loader title={props.hideTitle ? undefined : "Loading violations..."} />
       ) : (
           <>
             <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -277,35 +274,22 @@ function ViolationsList({}: ViolationsListProps) {
             )}
             {filteredViolations.length > 0 && (
               <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Resource</TableCell>
-                      <TableCell>Kind</TableCell>
-                      <TableCell>Constraint</TableCell>
-                      <TableCell>Constraint Kind</TableCell>
-                      <TableCell>Enforcement</TableCell>
-                      <TableCell>Message</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredViolations.map((violation, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
+                <SimpleTable
+                  data={filteredViolations}
+                  columns={[
+                    {
+                      label: 'Resource',
+                      getter: (violation: any) => getResourceName(violation),
+                    },
+                    {
+                      label: 'Kind',
+                      getter: (violation: any) => violation.kind,
+                    },
+                    {
+                      label: 'Constraint',
+                      getter: (violation: any) => (
                           <Link
-                            routeName="gatekeeper/violations/:kind/:name"
-                            params={{
-                              kind: violation.constraintKind,
-                              name: violation.constraintName,
-                            }}
-                          >
-                            {getResourceName(violation)}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{violation.kind}</TableCell>
-                        <TableCell>
-                          <Link
-                            routeName="gatekeeper/constraints/:kind/:name"
+                            routeName={RoutingPath.Constraint}
                             params={{
                               kind: violation.constraintKind,
                               name: violation.constraintName,
@@ -313,14 +297,22 @@ function ViolationsList({}: ViolationsListProps) {
                           >
                             {violation.constraintName}
                           </Link>
-                        </TableCell>
-                        <TableCell>{violation.constraintKind}</TableCell>
-                        <TableCell>{makeEnforcementActionChip(violation)}</TableCell>
-                        <TableCell>{violation.message}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                      )
+                    },
+                    {
+                      label: 'Constraint Kind',
+                      getter: (violation: any) => violation.constraintKind,
+                    },
+                    {
+                      label: 'Enforcement',
+                      getter: (violation: any) => makeEnforcementActionChip(violation),
+                    },
+                    {
+                      label: 'Message',
+                      getter: (violation: any) => violation.message,
+                    },
+                  ]}
+                />
               </TableContainer>
             )}
           </>

@@ -4,7 +4,6 @@ import React from 'react';
 
 let effectiveRequestFunc: ((url: string, M?: any, O?: any, P?: any) => Promise<any>) | undefined = undefined;
 
-// Assign effectiveRequestFunc based on the findings from ApiProxyModuleFromLib, safely
 if (ApiProxyModuleFromLib) {
   const moduleAsAny = ApiProxyModuleFromLib as any;
   if (typeof moduleAsAny.request === 'function') {
@@ -33,7 +32,7 @@ export const ConstraintTemplateClass = makeCustomResourceClass({
 async function discoverConstraintTypes(): Promise<string[]> {
   if (typeof effectiveRequestFunc !== 'function') {
     console.error('[model.ts] discoverConstraintTypes: effectiveRequestFunc is NOT a function. Cannot make API call.');
-    return []; // Early exit if request function is not available
+    return [];
   }
 
   try {
@@ -42,7 +41,7 @@ async function discoverConstraintTypes(): Promise<string[]> {
     if (templatesResponse && templatesResponse.items && Array.isArray(templatesResponse.items)) {
       const constraintTypes = templatesResponse.items.map((template: any, index: number) => {
         if (!template || !template.spec || !template.spec.crd || !template.spec.crd.spec || !template.spec.crd.spec.names) {
-          console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] has unexpected structure. Skipping. Path spec.crd.spec.names not fully available.`);
+          console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] has unexpected structure. Skipping.`);
           return null;
         }
 
@@ -55,22 +54,15 @@ async function discoverConstraintTypes(): Promise<string[]> {
           console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] missing plural name, falling back to kind: ${kind}`);
           return kind.toLowerCase();
         }
-        console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] missing both plural and kind names in spec.crd.spec.names. Skipping.`);
         return null;
-      }).filter(Boolean); // filter(Boolean) removes nulls
+      }).filter(Boolean);
 
       return constraintTypes as string[];
     }
 
-    console.warn('[model.ts] discoverConstraintTypes: templatesResponse.items is missing, null, or not an array. Cannot extract types.');
     return [];
   } catch (error: any) {
     console.error('[model.ts] discoverConstraintTypes: Error during discovery process:', error.message, error);
-    if (error.response && error.response.data) {
-      console.error('[model.ts] discoverConstraintTypes: Error response data:', JSON.stringify(error.response.data, null, 2));
-    } else if (error.response) {
-      console.error('[model.ts] discoverConstraintTypes: Error response (no data field):', JSON.stringify(error.response, null, 2));
-    }
     return [];
   }
 }
@@ -93,27 +85,23 @@ async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
   }
 }
 
-// Cache for discovered constraint types
 let constraintTypesPromise: Promise<string[]> | null = null;
 
 // Dynamic constraint class that discovers types at runtime
 export const ConstraintClass = {
-  // List all constraints by discovering and aggregating from all constraint types
   useApiList: (setData: (data: any) => void) => {
     const [allConstraints, setAllConstraints] = React.useState<any[]>([]);
     const [discoveredTypes, setDiscoveredTypes] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<Error | null>(null);
 
-    // Discover constraint types on component mount
     React.useEffect(() => {
       const performDiscovery = async () => {
-        constraintTypesPromise = null; // Clear cache for fresh discovery
+        constraintTypesPromise = null;
         setLoading(true);
         setError(null);
 
         if (typeof effectiveRequestFunc !== 'function') {
-          console.error('[model.ts] useApiList/performDiscovery: effectiveRequestFunc is not available. Cannot discover types.');
           setError(new Error('API request function not available for discovery.'));
           setDiscoveredTypes([]);
           setLoading(false);
@@ -126,7 +114,6 @@ export const ConstraintClass = {
           const types = await currentDiscoveryPromise;
           setDiscoveredTypes(types);
         } catch (e: any) {
-          console.error('[model.ts] useApiList: Error during type discovery await:', e);
           setError(e);
           setDiscoveredTypes([]);
         } finally {
@@ -135,28 +122,18 @@ export const ConstraintClass = {
       };
 
       performDiscovery();
-    }, [setData]); // Removed discoveredTypes, loading, error from deps as they are set within this effect
+    }, [setData]);
 
-    // Fetch constraints based on discovered types
     React.useEffect(() => {
-      if (loading) {
-        return;
-      }
+      if (loading) return;
 
-      if (error) {
-        setAllConstraints([]);
-        setData([]);
-        return;
-      }
-
-      if (discoveredTypes.length === 0) {
+      if (error || discoveredTypes.length === 0) {
         setAllConstraints([]);
         setData([]);
         return;
       }
 
       if (typeof effectiveRequestFunc !== 'function') {
-        console.error('[model.ts] useApiList/fetchAllConstraintData: effectiveRequestFunc is not available. Cannot fetch constraints.');
         setError(new Error('API request function not available for fetching constraints.'));
         setAllConstraints([]);
         setData([]);
@@ -180,7 +157,7 @@ export const ConstraintClass = {
         }
 
         if (fetchErrorOccurred) {
-          console.warn("[model.ts] useApiList: One or more constraint types failed to fetch. Displaying partial data if available.");
+          console.warn("[model.ts] useApiList: One or more constraint types failed to fetch.");
         }
         setAllConstraints(allData);
       };
@@ -188,20 +165,17 @@ export const ConstraintClass = {
       fetchAllConstraintData();
     }, [discoveredTypes, loading, error, setData]);
 
-    // Update the data callback when allConstraints change
     React.useEffect(() => {
       setData(allConstraints);
     }, [allConstraints, setData]);
   },
 
-  // Get a specific constraint by name, trying all discovered constraint types
   useApiGet: (setData: (data: any) => void, name: string, constraintType?: string) => {
     const [constraintData, setConstraintData] = React.useState<any>(null);
     const [discoveredTypes, setDiscoveredTypes] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<Error | null>(null);
 
-    // Discover constraint types first
     React.useEffect(() => {
       if (!name) {
         setLoading(false);
@@ -215,7 +189,6 @@ export const ConstraintClass = {
         setError(null);
 
         if (typeof effectiveRequestFunc !== 'function') {
-          console.error('[model.ts] useApiGet/performDiscovery: effectiveRequestFunc is not available. Cannot discover types.');
           setError(new Error('API request function not available for discovery.'));
           setDiscoveredTypes([]);
           setLoading(false);
@@ -228,7 +201,6 @@ export const ConstraintClass = {
           const types = await currentDiscoveryPromise;
           setDiscoveredTypes(types);
         } catch (e: any) {
-          console.error('[model.ts] useApiGet: Error during type discovery await:', e);
           setError(e);
           setDiscoveredTypes([]);
         } finally {
@@ -237,30 +209,17 @@ export const ConstraintClass = {
       };
 
       performDiscovery();
-    }, [name, setData]); // Removed discoveredTypes, loading, error from deps
+    }, [name, setData]);
 
-    // Search for the constraint across all types
     React.useEffect(() => {
-      if (!name) {
-        return;
-      }
+      if (!name || loading) return;
 
-      if (loading) {
-        return;
-      }
-
-      if (error) {
-        setConstraintData(null);
-        return;
-      }
-
-      if (discoveredTypes.length === 0) {
+      if (error || discoveredTypes.length === 0) {
         setConstraintData(null);
         return;
       }
 
       if (typeof effectiveRequestFunc !== 'function') {
-        console.error(`[model.ts] useApiGet/findConstraint: effectiveRequestFunc is not usable.`);
         setConstraintData(null);
         setError(new Error('API request function not available for finding constraint.'));
         return;
@@ -268,7 +227,6 @@ export const ConstraintClass = {
 
       const findConstraint = async () => {
         let foundConstraint = null;
-        let findErrorOccurred = false;
 
         if (constraintType) {
           try {
@@ -278,16 +236,13 @@ export const ConstraintClass = {
               foundConstraint = response;
             }
           } catch (e: any) {
-            console.warn(`[model.ts] useApiGet: Constraint "${name}" not found in specified type "${constraintType}". Error: ${e.message}`);
-            findErrorOccurred = true;
+            console.warn(`[model.ts] useApiGet: Constraint "${name}" not found in specified type "${constraintType}".`);
           }
         }
 
         if (!foundConstraint) {
           for (const type of discoveredTypes) {
-            if (constraintType && type === constraintType) {
-              continue;
-            }
+            if (constraintType && type === constraintType) continue;
             try {
               const url = `/apis/constraints.gatekeeper.sh/v1beta1/${type}/${name}`;
               const response = await effectiveRequestFunc(url);
@@ -296,14 +251,9 @@ export const ConstraintClass = {
                 break;
               }
             } catch (e: any) {
-              // console.debug(`[model.ts] useApiGet: Constraint "${name}" not found in type "${type}". Error: ${e.message}`);
-              findErrorOccurred = true;
+              // Ignore 404s when searching across types
             }
           }
-        }
-
-        if (findErrorOccurred && !foundConstraint) {
-          console.warn(`[model.ts] useApiGet: Errors occurred while searching for constraint "${name}", and it was not found.`);
         }
 
         if (foundConstraint) {
@@ -314,15 +264,13 @@ export const ConstraintClass = {
       };
 
       findConstraint();
-    }, [name, constraintType, discoveredTypes, loading, error]); // Dependencies for searching
+    }, [name, constraintType, discoveredTypes, loading, error]);
 
-    // Update the data callback when constraintData changes
     React.useEffect(() => {
       setData(constraintData);
     }, [constraintData, setData, name]);
   },
 };
 
-// Export aliases for convenience
 export { ConstraintTemplateClass as ConstraintTemplate };
 export { ConstraintClass as Constraint };

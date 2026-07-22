@@ -1,14 +1,10 @@
 import {
   Link as HeadlampLink,
   SectionBox,
+  SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
   Select,
   MenuItem,
@@ -26,9 +22,9 @@ import { ConstraintClass, ConstraintTemplateClass } from '../model';
 import { Constraint } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ConstraintListProps {}
+interface ConstraintListProps { hideTitle?: boolean; }
 
-function ConstraintList({}: ConstraintListProps) {
+function ConstraintList(props: ConstraintListProps) {
   const [constraints, setConstraints] = useState<any[] | null>(null);
   const [kindFilter, setKindFilter] = useState<string>('All');
   const [enforcementActionFilter, setEnforcementActionFilter] = useState<string>('All');
@@ -124,7 +120,7 @@ function ConstraintList({}: ConstraintListProps) {
     };
 
     return (
-      <SectionBox title="Constraints">
+      <SectionBox title={props.hideTitle ? undefined : "Constraints"}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
@@ -181,7 +177,7 @@ function ConstraintList({}: ConstraintListProps) {
   }
 
   return (
-    <SectionBox title="Constraints">
+    <SectionBox title={props.hideTitle ? undefined : "Constraints"}>
       <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 150 }} size="small">
           <InputLabel id="kind-filter-label">Kind</InputLabel>
@@ -215,40 +211,45 @@ function ConstraintList({}: ConstraintListProps) {
           {constraints.length > 0 ? 'No constraints match the current filters.' : 'No constraints found.'}
         </Typography>
       ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Kind</TableCell>
-                <TableCell>Enforcement Action</TableCell>
-                <TableCell>Matched Kinds</TableCell>
-                <TableCell>Violations</TableCell>
-                <TableCell>Age</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredConstraints.map((constraint) => (
-                <TableRow key={`${constraint.kind}-${constraint.metadata.name}`}>
-                  <TableCell>
-                    <HeadlampLink
-                      routeName={RoutingPath.Constraint}
-                      params={{
-                        kind: constraint.kind,
-                        name: constraint.metadata.name,
-                      }}
-                    >
-                      {constraint.metadata.name}
-                    </HeadlampLink>
-                  </TableCell>
-                  <TableCell>{constraint.kind}</TableCell>
-                  <TableCell>{makeEnforcementActionChip(constraint)}</TableCell>
-                  <TableCell>{getMatchedKinds(constraint)}</TableCell>
-                  <TableCell>{getViolationCount(constraint)}</TableCell>
-                  <TableCell>{constraint.metadata.creationTimestamp}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <SimpleTable
+            data={filteredConstraints}
+            columns={[
+              {
+                label: 'Name',
+                getter: (constraint) => (
+                  <HeadlampLink
+                    routeName={RoutingPath.Constraint}
+                    params={{
+                      kind: constraint.kind,
+                      name: constraint.metadata.name,
+                    }}
+                  >
+                    {constraint.metadata.name}
+                  </HeadlampLink>
+                ),
+              },
+              {
+                label: 'Kind',
+                getter: (constraint) => constraint.kind,
+              },
+              {
+                label: 'Enforcement Action',
+                getter: (constraint) => makeEnforcementActionChip(constraint),
+              },
+              {
+                label: 'Target Kinds',
+                getter: (constraint) => getMatchedKinds(constraint) || '-',
+              },
+              {
+                label: 'Violations',
+                getter: (constraint) => getViolationCount(constraint),
+              },
+              {
+                label: 'Age',
+                getter: (constraint) => constraint.metadata.creationTimestamp,
+              },
+            ]}
+          />
       )}
     </SectionBox>
   );

@@ -1,14 +1,10 @@
 import {
   Link as HeadlampLink,
   SectionBox,
+  SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
   Box,
   Select,
@@ -27,9 +23,9 @@ import { ConstraintTemplateClass } from '../model';
 import { ConstraintTemplate } from '../types';
 import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ConstraintTemplateListProps {}
+interface ConstraintTemplateListProps { hideTitle?: boolean; }
 
-function ConstraintTemplateList({}: ConstraintTemplateListProps) {
+function ConstraintTemplateList(props: ConstraintTemplateListProps) {
   const [constraintTemplates, setConstraintTemplates] = useState<KubeObject[] | null>(null);
   const [selectedTargetFilter, setSelectedTargetFilter] = useState<string>('');
   const [gatekeeperNotInstalled, setGatekeeperNotInstalled] = useState(false);
@@ -106,7 +102,7 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
     };
 
     return (
-      <SectionBox title="Constraint Templates">
+      <SectionBox title={props.hideTitle ? undefined : "Constraint Templates"}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
@@ -150,7 +146,7 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
   }
 
   return (
-    <SectionBox title="Constraint Templates">
+    <SectionBox title={props.hideTitle ? undefined : "Constraint Templates"}>
       <Box sx={{ marginBottom: 2, maxWidth: 300 }}>
         <FormControl fullWidth size="small">
           <InputLabel id="target-filter-label">Filter by Target</InputLabel>
@@ -176,37 +172,40 @@ function ConstraintTemplateList({}: ConstraintTemplateListProps) {
       ) : templates.length === 0 && constraintTemplates.length === 0 ? (
         <Typography sx={{ padding: 2 }}>No constraint templates found.</Typography>
       ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Kind</TableCell>
-                  <TableCell>Targets</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Age</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {templates.map((template) => (
-                  <TableRow key={template.metadata.name}>
-                    <TableCell>
-                      <HeadlampLink
-                        routeName={RoutingPath.ConstraintTemplate}
-                        params={{
-                          name: template.metadata.name,
-                        }}
-                      >
-                        {template.metadata.name}
-                      </HeadlampLink>
-                    </TableCell>
-                    <TableCell>{template.spec?.crd?.spec?.names?.kind || ''}</TableCell>
-                    <TableCell>{getTargets(template)}</TableCell>
-                    <TableCell>{makeStatusLabel(template)}</TableCell>
-                    <TableCell>{template.metadata.creationTimestamp}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <SimpleTable
+              data={templates}
+              columns={[
+                {
+                  label: 'Name',
+                  getter: (template: any) => (
+                    <HeadlampLink
+                      routeName={RoutingPath.ConstraintTemplate}
+                      params={{
+                        name: template.metadata.name,
+                      }}
+                    >
+                      {template.metadata.name}
+                    </HeadlampLink>
+                  ),
+                },
+                {
+                  label: 'Kind',
+                  getter: (template: any) => template.spec?.crd?.spec?.names?.kind || '',
+                },
+                {
+                  label: 'Targets',
+                  getter: (template: any) => getTargets(template),
+                },
+                {
+                  label: 'Status',
+                  getter: (template: any) => makeStatusLabel(template),
+                },
+                {
+                  label: 'Age',
+                  getter: (template: any) => template.metadata.creationTimestamp,
+                },
+              ]}
+            />
       )}
     </SectionBox>
   );

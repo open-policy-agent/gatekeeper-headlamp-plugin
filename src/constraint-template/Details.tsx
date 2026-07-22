@@ -91,9 +91,9 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
         const cluster = clusterMatch ? clusterMatch[1] : null;
         
         if (cluster) {
-          history.push(`/c/${cluster}${RoutingPath.ConstraintTemplates}`);
+          history.push(`/c/${cluster}${RoutingPath.Constraints}`);
         } else {
-          history.push(RoutingPath.ConstraintTemplates);
+          history.push(RoutingPath.Constraints);
         }
       }, 1500);
 
@@ -160,7 +160,7 @@ function ConstraintTemplateDetails({}: ConstraintTemplateDetailsProps) {
   }
 
   return (
-    <Box>
+    <Box sx={{ pt: 2, pb: 2 }}>
       {/* Header with title and delete button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>

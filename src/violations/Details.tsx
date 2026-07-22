@@ -14,6 +14,7 @@ import {
   Typography} from '@mui/material';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { RoutingPath } from '../index';
 import { ConstraintClass } from '../model';
 
 interface ViolationsDetailsProps {}
@@ -43,7 +44,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
         name: 'Constraint Name',
         value: (
           <Link
-            routeName="gatekeeper/constraints/:kind/:name"
+            routeName={RoutingPath.Constraint}
             params={{
               kind: constraint.kind,
               name: constraint.metadata.name,
@@ -121,7 +122,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
   }
 
   return (
-    <Box>
+    <Box sx={{ pt: 2, pb: 2 }}>
       <Typography variant="h4" gutterBottom>
         Violations for {constraint.metadata.name}
       </Typography>
