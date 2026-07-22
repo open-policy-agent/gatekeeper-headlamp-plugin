@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SectionBox, SimpleTable, Link, Loader } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { Typography, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
+import { Typography, Select, MenuItem, FormControl, InputLabel, Box, TextField, Button, Alert, AlertTitle } from '@mui/material';
 import yaml from 'js-yaml'; // Import js-yaml
 
 // Define a type for the structure of a library item (template)
@@ -33,12 +33,16 @@ function generateFallbackName(dirName: string): string {
 }
 
 // Fetches directory contents or file metadata from GitHub API
-async function fetchGitHubAPI(path: string): Promise<any> {
+async function fetchGitHubAPI(path: string, token: string = ''): Promise<any> {
   const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}?ref=${GITHUB_BRANCH}`;
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
   const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-    },
+    headers,
   });
   if (!response.ok) {
     const errorBody = await response.text();
@@ -58,14 +62,14 @@ async function fetchFileContent(url: string): Promise<string> {
   return response.text();
 }
 
-const fetchLibraryTemplates = async (): Promise<LibraryTemplate[]> => {
+const fetchLibraryTemplates = async (token: string = ''): Promise<LibraryTemplate[]> => {
   console.log('[LibraryList] Starting to fetch library templates from GitHub...');
   const collectedTemplates: LibraryTemplate[] = [];
 
   let categoriesDirs: any[];
   try {
     // 1. Fetch categories (subdirectories under LIBRARY_BASE_PATH)
-    categoriesDirs = await fetchGitHubAPI(LIBRARY_BASE_PATH);
+    categoriesDirs = await fetchGitHubAPI(LIBRARY_BASE_PATH, token);
     if (!Array.isArray(categoriesDirs)) {
       console.error('[LibraryList] Expected an array for categories, got:', categoriesDirs);
       throw new Error('Invalid response when fetching library categories.');
@@ -83,7 +87,7 @@ const fetchLibraryTemplates = async (): Promise<LibraryTemplate[]> => {
       let templateDirs: any[];
       try {
         // 2. Fetch template directories within this category
-        templateDirs = await fetchGitHubAPI(categoryDir.path);
+        templateDirs = await fetchGitHubAPI(categoryDir.path, token);
         if (!Array.isArray(templateDirs)) {
           console.error(`[LibraryList] Expected an array for templates in category ${categoryName}, got:`, templateDirs);
           return; // Skip this category
@@ -154,21 +158,40 @@ function LibraryList() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>(''); // '' for All Categories
+  const [githubToken, setGithubToken] = useState<string>(() => localStorage.getItem('gatekeeper_github_token') || '');
+  const [isOffline, setIsOffline] = useState<boolean>(false);
 
-  useEffect(() => {
+  const handleSaveToken = () => {
+    localStorage.setItem('gatekeeper_github_token', githubToken);
+    loadData();
+  };
+
+  const loadData = () => {
     setLoading(true);
-    fetchLibraryTemplates()
+    setError(null);
+    setIsOffline(false);
+    fetchLibraryTemplates(githubToken)
       .then(data => {
         setTemplates(data);
-        setError(null);
+        setLoading(false);
       })
       .catch(err => {
-        setError(`Failed to load library templates: ${err.message}`);
+        const msg = err.message || '';
+        if (msg.includes('rate limit exceeded') || msg.includes('403')) {
+          setError(`GitHub API rate limit exceeded. Please provide a GitHub token to authenticate your requests and increase your limit.`);
+        } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+          setIsOffline(true);
+          setError(`Network error: Unable to reach GitHub. You might be in an air-gapped environment or offline.`);
+        } else {
+          setError(`Failed to load library templates: ${msg}`);
+        }
         setTemplates([]);
-      })
-      .finally(() => {
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const categories = Array.from(new Set(templates.map(t => t.category))).sort();
@@ -191,8 +214,35 @@ function LibraryList() {
 
   if (error) {
     return (
-      <SectionBox title="Gatekeeper Library">
-        <Typography color="error">{error}</Typography>
+      <SectionBox title="Policy Library">
+        <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+          <TextField
+            label="GitHub Personal Access Token"
+            variant="outlined"
+            size="small"
+            type="password"
+            value={githubToken}
+            onChange={(e) => setGithubToken(e.target.value)}
+            sx={{ minWidth: 300 }}
+          />
+          <Button variant="contained" onClick={handleSaveToken}>
+            Save & Retry
+          </Button>
+        </Box>
+        
+        {isOffline ? (
+          <Alert severity="warning">
+            <AlertTitle>Network Offline or Air-gapped Environment</AlertTitle>
+            {error}
+            <br />
+            The Policy Library relies on fetching external data from the open-policy-agent GitHub repository.
+          </Alert>
+        ) : (
+          <Alert severity="error">
+            <AlertTitle>Error Loading Library</AlertTitle>
+            {error}
+          </Alert>
+        )}
       </SectionBox>
     );
   }
