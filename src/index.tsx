@@ -12,6 +12,10 @@ import AssignImageDetails from './mutation/AssignImageDetails';
 import ModifySetDetails from './mutation/ModifySetDetails';
 import ConfigDetails from './configuration/ConfigDetails';
 import SyncSetDetails from './configuration/SyncSetDetails';
+import ProviderDetails from './externaldata/ProviderDetails';
+import ConnectionDetails from './externaldata/ConnectionDetails';
+import ExpansionTemplateList from './expansion/ExpansionTemplateList';
+import ExpansionTemplateDetails from './expansion/ExpansionTemplateDetails';
 
 import LibraryList from './library/List';
 import LibraryTemplateDetails from './library/TemplateDetails';
@@ -19,6 +23,7 @@ import LibraryTemplateDetails from './library/TemplateDetails';
 import ConstraintsPage from './constraints/ConstraintsPage';
 import MutationsPage from './mutation/MutationsPage';
 import ConfigurationPage from './configuration/ConfigurationPage';
+import ExternalDataPage from './externaldata/ExternalDataPage';
 
 export namespace RoutingPath {
   // Library
@@ -48,6 +53,17 @@ export namespace RoutingPath {
   export const Config = '/gatekeeper/configuration/configs/:namespace/:name';
   export const SyncSets = '/gatekeeper/configuration/syncsets';
   export const SyncSet = '/gatekeeper/configuration/syncsets/:name';
+
+  // External Data
+  export const ExternalData = '/gatekeeper/externaldata';
+  export const Providers = '/gatekeeper/externaldata/providers';
+  export const Provider = '/gatekeeper/externaldata/providers/:name';
+  export const Connections = '/gatekeeper/externaldata/connections';
+  export const Connection = '/gatekeeper/externaldata/connections/:namespace/:name';
+
+  // Expansion
+  export const ExpansionTemplates = '/gatekeeper/expansion/expansiontemplates';
+  export const ExpansionTemplate = '/gatekeeper/expansion/expansiontemplates/:name';
 }
 
 // Register sidebar items
@@ -78,6 +94,20 @@ registerSidebarEntry({
   name: 'gatekeeper-configuration',
   label: 'Configurations',
   url: RoutingPath.Configuration,
+});
+
+registerSidebarEntry({
+  parent: 'gatekeeper',
+  name: 'gatekeeper-externaldata',
+  label: 'External Data',
+  url: RoutingPath.ExternalData,
+});
+
+registerSidebarEntry({
+  parent: 'gatekeeper',
+  name: 'gatekeeper-expansion',
+  label: 'Expansion Templates',
+  url: RoutingPath.ExpansionTemplates,
 });
 
 registerSidebarEntry({
@@ -118,6 +148,22 @@ registerRoute({
   name: 'Configurations',
   exact: true,
   component: () => <ConfigurationPage />,
+});
+
+registerRoute({
+  path: RoutingPath.ExternalData,
+  sidebar: 'gatekeeper-externaldata',
+  name: 'External Data',
+  exact: true,
+  component: () => <ExternalDataPage />,
+});
+
+registerRoute({
+  path: RoutingPath.ExpansionTemplates,
+  sidebar: 'gatekeeper-expansion',
+  name: 'Expansion Templates',
+  exact: true,
+  component: () => <ExpansionTemplateList />,
 });
 
 // --- Details Pages Routes ---
@@ -199,6 +245,30 @@ registerRoute({
   name: 'SyncSet Details',
   exact: true,
   component: () => <SyncSetDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.Provider,
+  sidebar: 'gatekeeper-externaldata',
+  name: 'Provider Details',
+  exact: true,
+  component: () => <ProviderDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.Connection,
+  sidebar: 'gatekeeper-externaldata',
+  name: 'Connection Details',
+  exact: true,
+  component: () => <ConnectionDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.ExpansionTemplate,
+  sidebar: 'gatekeeper-expansion',
+  name: 'ExpansionTemplate Details',
+  exact: true,
+  component: () => <ExpansionTemplateDetails />,
 });
 
 // Export plugin info for Headlamp recognition

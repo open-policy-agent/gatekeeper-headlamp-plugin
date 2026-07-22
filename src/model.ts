@@ -325,4 +325,33 @@ export const SyncSetClass = makeCustomResourceClass({
   pluralName: 'syncsets',
 });
 
+// --- External Data Models ---
+const apiGatekeeperExternalDataGroupVersion = [
+  { group: 'externaldata.gatekeeper.sh', version: 'v1alpha1' },
+  { group: 'externaldata.gatekeeper.sh', version: 'v1beta1' },
+];
+
+export const ProviderClass = makeCustomResourceClass({
+  apiInfo: apiGatekeeperExternalDataGroupVersion,
+  isNamespaced: false,
+  singularName: 'Provider',
+  pluralName: 'providers',
+});
+
+export const ConnectionClass = makeCustomResourceClass({
+  apiInfo: [{ group: 'connection.gatekeeper.sh', version: 'v1alpha1' }, { group: 'connection.gatekeeper.sh', version: 'v1beta1' }],
+  isNamespaced: true,
+  singularName: 'Connection',
+  pluralName: 'connections',
+});
+
+// --- Expansion Models ---
+export const ExpansionTemplateClass = makeCustomResourceClass({
+  apiInfo: [{ group: 'expansion.gatekeeper.sh', version: 'v1alpha1' }, { group: 'expansion.gatekeeper.sh', version: 'v1beta1' }],
+  isNamespaced: false,
+  singularName: 'ExpansionTemplate',
+  pluralName: 'expansiontemplate',
+});
+
+
 
