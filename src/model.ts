@@ -274,3 +274,39 @@ export const ConstraintClass = {
 
 export { ConstraintTemplateClass as ConstraintTemplate };
 export { ConstraintClass as Constraint };
+
+// --- Mutation Models ---
+const apiGatekeeperMutationsGroupVersion = [
+  { group: 'mutations.gatekeeper.sh', version: 'v1' },
+  { group: 'mutations.gatekeeper.sh', version: 'v1beta1' },
+  { group: 'mutations.gatekeeper.sh', version: 'v1alpha1' },
+];
+
+export const AssignClass = makeCustomResourceClass({
+  apiInfo: apiGatekeeperMutationsGroupVersion,
+  isNamespaced: false,
+  singularName: 'Assign',
+  pluralName: 'assign',
+});
+
+export const AssignMetadataClass = makeCustomResourceClass({
+  apiInfo: apiGatekeeperMutationsGroupVersion,
+  isNamespaced: false,
+  singularName: 'AssignMetadata',
+  pluralName: 'assignmetadata',
+});
+
+export const AssignImageClass = makeCustomResourceClass({
+  apiInfo: apiGatekeeperMutationsGroupVersion,
+  isNamespaced: false,
+  singularName: 'AssignImage',
+  pluralName: 'assignimage',
+});
+
+export const ModifySetClass = makeCustomResourceClass({
+  apiInfo: apiGatekeeperMutationsGroupVersion,
+  isNamespaced: false,
+  singularName: 'ModifySet',
+  pluralName: 'modifyset',
+});
+

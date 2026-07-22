@@ -6,10 +6,16 @@ import ConstraintDetails from './constraint/Details';
 import ConstraintTemplateDetails from './constraint-template/Details';
 import ViolationsDetails from './violations/Details';
 
+import AssignDetails from './mutation/AssignDetails';
+import AssignMetadataDetails from './mutation/AssignMetadataDetails';
+import AssignImageDetails from './mutation/AssignImageDetails';
+import ModifySetDetails from './mutation/ModifySetDetails';
+
 import LibraryList from './library/List';
 import LibraryTemplateDetails from './library/TemplateDetails';
 
 import ConstraintsPage from './constraints/ConstraintsPage';
+import MutationsPage from './mutation/MutationsPage';
 
 export namespace RoutingPath {
   // Library
@@ -21,6 +27,17 @@ export namespace RoutingPath {
   export const Constraints = '/gatekeeper/constraints';
   export const Constraint = '/gatekeeper/constraints/:kind/:name';
   export const Violation = '/gatekeeper/violations/:kind/:name';
+
+  // Mutations
+  export const Mutations = '/gatekeeper/mutations';
+  export const Assigns = '/gatekeeper/mutations/assigns';
+  export const Assign = '/gatekeeper/mutations/assigns/:name';
+  export const AssignMetadatas = '/gatekeeper/mutations/assignmetadatas';
+  export const AssignMetadata = '/gatekeeper/mutations/assignmetadatas/:name';
+  export const AssignImages = '/gatekeeper/mutations/assignimages';
+  export const AssignImage = '/gatekeeper/mutations/assignimages/:name';
+  export const ModifySets = '/gatekeeper/mutations/modifysets';
+  export const ModifySet = '/gatekeeper/mutations/modifysets/:name';
 }
 
 // Register sidebar items
@@ -37,6 +54,13 @@ registerSidebarEntry({
   name: 'gatekeeper-constraints',
   label: 'Constraints',
   url: RoutingPath.Constraints,
+});
+
+registerSidebarEntry({
+  parent: 'gatekeeper',
+  name: 'gatekeeper-mutations',
+  label: 'Mutations',
+  url: RoutingPath.Mutations,
 });
 
 registerSidebarEntry({
@@ -61,6 +85,14 @@ registerRoute({
   name: 'Constraints',
   exact: true,
   component: () => <ConstraintsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Mutations,
+  sidebar: 'gatekeeper-mutations',
+  name: 'Mutations',
+  exact: true,
+  component: () => <MutationsPage />,
 });
 
 // --- Details Pages Routes ---
@@ -94,6 +126,38 @@ registerRoute({
   exact: true,
   sidebar: 'gatekeeper-constraints',
   component: () => <ViolationsDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.Assign,
+  sidebar: 'gatekeeper-mutations',
+  name: 'Assign Details',
+  exact: true,
+  component: () => <AssignDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.AssignMetadata,
+  sidebar: 'gatekeeper-mutations',
+  name: 'AssignMetadata Details',
+  exact: true,
+  component: () => <AssignMetadataDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.AssignImage,
+  sidebar: 'gatekeeper-mutations',
+  name: 'AssignImage Details',
+  exact: true,
+  component: () => <AssignImageDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.ModifySet,
+  sidebar: 'gatekeeper-mutations',
+  name: 'ModifySet Details',
+  exact: true,
+  component: () => <ModifySetDetails />,
 });
 
 // Export plugin info for Headlamp recognition
