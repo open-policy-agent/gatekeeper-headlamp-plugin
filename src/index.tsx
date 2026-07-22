@@ -10,12 +10,15 @@ import AssignDetails from './mutation/AssignDetails';
 import AssignMetadataDetails from './mutation/AssignMetadataDetails';
 import AssignImageDetails from './mutation/AssignImageDetails';
 import ModifySetDetails from './mutation/ModifySetDetails';
+import ConfigDetails from './configuration/ConfigDetails';
+import SyncSetDetails from './configuration/SyncSetDetails';
 
 import LibraryList from './library/List';
 import LibraryTemplateDetails from './library/TemplateDetails';
 
 import ConstraintsPage from './constraints/ConstraintsPage';
 import MutationsPage from './mutation/MutationsPage';
+import ConfigurationPage from './configuration/ConfigurationPage';
 
 export namespace RoutingPath {
   // Library
@@ -38,6 +41,13 @@ export namespace RoutingPath {
   export const AssignImage = '/gatekeeper/mutations/assignimages/:name';
   export const ModifySets = '/gatekeeper/mutations/modifysets';
   export const ModifySet = '/gatekeeper/mutations/modifysets/:name';
+
+  // Configuration
+  export const Configuration = '/gatekeeper/configuration';
+  export const Configs = '/gatekeeper/configuration/configs';
+  export const Config = '/gatekeeper/configuration/configs/:namespace/:name';
+  export const SyncSets = '/gatekeeper/configuration/syncsets';
+  export const SyncSet = '/gatekeeper/configuration/syncsets/:name';
 }
 
 // Register sidebar items
@@ -61,6 +71,13 @@ registerSidebarEntry({
   name: 'gatekeeper-mutations',
   label: 'Mutations',
   url: RoutingPath.Mutations,
+});
+
+registerSidebarEntry({
+  parent: 'gatekeeper',
+  name: 'gatekeeper-configuration',
+  label: 'Configurations',
+  url: RoutingPath.Configuration,
 });
 
 registerSidebarEntry({
@@ -93,6 +110,14 @@ registerRoute({
   name: 'Mutations',
   exact: true,
   component: () => <MutationsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Configuration,
+  sidebar: 'gatekeeper-configuration',
+  name: 'Configurations',
+  exact: true,
+  component: () => <ConfigurationPage />,
 });
 
 // --- Details Pages Routes ---
@@ -158,6 +183,22 @@ registerRoute({
   name: 'ModifySet Details',
   exact: true,
   component: () => <ModifySetDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.Config,
+  sidebar: 'gatekeeper-configuration',
+  name: 'Config Details',
+  exact: true,
+  component: () => <ConfigDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.SyncSet,
+  sidebar: 'gatekeeper-configuration',
+  name: 'SyncSet Details',
+  exact: true,
+  component: () => <SyncSetDetails />,
 });
 
 // Export plugin info for Headlamp recognition

@@ -310,3 +310,19 @@ export const ModifySetClass = makeCustomResourceClass({
   pluralName: 'modifyset',
 });
 
+// --- Configuration Models ---
+export const ConfigClass = makeCustomResourceClass({
+  apiInfo: [{ group: 'config.gatekeeper.sh', version: 'v1alpha1' }],
+  isNamespaced: true,
+  singularName: 'Config',
+  pluralName: 'configs',
+});
+
+export const SyncSetClass = makeCustomResourceClass({
+  apiInfo: [{ group: 'syncset.gatekeeper.sh', version: 'v1alpha1' }],
+  isNamespaced: false,
+  singularName: 'SyncSet',
+  pluralName: 'syncsets',
+});
+
+
