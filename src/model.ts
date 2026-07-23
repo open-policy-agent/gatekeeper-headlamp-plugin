@@ -155,14 +155,19 @@ export function getConstraintTypeDefinitions(templatesResponse: any): Constraint
   templatesResponse.items.forEach((template: any, index: number) => {
     const names = template?.spec?.crd?.spec?.names;
     const kind = typeof names?.kind === 'string' ? names.kind.trim() : '';
-    const plural = typeof names?.plural === 'string' ? names.plural.trim().toLowerCase() : '';
 
-    if (!kind || !plural) {
+    if (!kind) {
       console.warn(
-        `[model.ts] getConstraintTypeDefinitions: Template item [${index}] is missing a Kubernetes kind or REST plural. Skipping.`
+        `[model.ts] getConstraintTypeDefinitions: Template item [${index}] is missing a Kubernetes kind. Skipping.`
       );
       return;
     }
+
+    // Gatekeeper permits ConstraintTemplates to omit names.plural and generates the
+    // constraint CRD resource name from the lower-cased Kind in that case.
+    const explicitPlural =
+      typeof names?.plural === 'string' ? names.plural.trim().toLowerCase() : '';
+    const plural = explicitPlural || kind.toLowerCase();
 
     definitionsByKey.set(`${kind}\u0000${plural}`, { kind, plural });
   });

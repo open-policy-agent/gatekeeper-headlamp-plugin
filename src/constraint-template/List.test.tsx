@@ -24,12 +24,12 @@ vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
 
 vi.mock('react-router-dom', () => ({
   useHistory: () => ({ push: mocks.historyPush }),
-  useLocation: () => ({ pathname: '/c/test-cluster/gatekeeper/constrainttemplates' }),
+  useLocation: () => ({ pathname: '/c/test-cluster/gatekeeper/constraint-templates' }),
 }));
 
 vi.mock('../index', () => ({
   RoutingPath: {
-    ConstraintTemplate: '/gatekeeper/constrainttemplates/:name',
+    ConstraintTemplate: '/gatekeeper/constraint-templates/:name',
   },
 }));
 

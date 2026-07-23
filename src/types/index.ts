@@ -5,7 +5,7 @@ export interface ConstraintTemplateSpec {
     spec: {
       names: {
         kind: string;
-        plural: string;
+        plural?: string;
       };
       validation?: {
         openAPIV3Schema?: any;

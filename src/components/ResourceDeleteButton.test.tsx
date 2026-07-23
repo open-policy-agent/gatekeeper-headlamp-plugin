@@ -25,7 +25,7 @@ describe('ResourceDeleteButton', () => {
   it('renders an optional consequence warning without replacing the confirmation text', async () => {
     const user = userEvent.setup();
     const history = createMemoryHistory({
-      initialEntries: ['/gatekeeper/constrainttemplates/example'],
+      initialEntries: ['/gatekeeper/constraint-templates/example'],
     });
 
     render(
@@ -33,7 +33,7 @@ describe('ResourceDeleteButton', () => {
         <ResourceDeleteButton
           resource={makeResource(vi.fn().mockResolvedValue(undefined))}
           kind="ConstraintTemplate"
-          redirectUrl="/gatekeeper/constrainttemplates"
+          redirectUrl="/gatekeeper/constraint-templates"
           warningText="Dependent policy instances may be removed."
         />
       </Router>

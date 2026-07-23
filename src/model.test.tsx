@@ -17,14 +17,14 @@ vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s/crd', () => ({
   makeCustomResourceClass: vi.fn(() => ({})),
 }));
 
-import { ConstraintClass } from './model';
+import { ConstraintClass, getConstraintTypeDefinitions } from './model';
 
-function constraintTemplate(kind: string, plural: string) {
+function constraintTemplate(kind: string, plural?: string) {
   return {
     spec: {
       crd: {
         spec: {
-          names: { kind, plural },
+          names: { kind, ...(plural ? { plural } : {}) },
         },
       },
     },
@@ -59,6 +59,14 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+});
+
+describe('getConstraintTypeDefinitions', () => {
+  it('derives the REST plural from Kind when a valid ConstraintTemplate omits names.plural', () => {
+    expect(
+      getConstraintTypeDefinitions({ items: [constraintTemplate('K8sRequiredLabels')] })
+    ).toEqual([{ kind: 'K8sRequiredLabels', plural: 'k8srequiredlabels' }]);
+  });
 });
 
 describe('ConstraintClass.useApiGet', () => {

@@ -12,7 +12,7 @@ import { useResourceDetails } from '../components/ResourceDetailsState';
 import ConstraintTemplateDetails from './Details';
 
 vi.mock('../index', () => ({
-  RoutingPath: { ConstraintTemplates: '/gatekeeper/constrainttemplates' },
+  RoutingPath: { ConstraintTemplates: '/gatekeeper/constraint-templates' },
 }));
 
 vi.mock('../model', () => ({
@@ -40,7 +40,7 @@ describe('ConstraintTemplateDetails', () => {
   it('warns that deletion may remove or affect dependent constraints', async () => {
     const user = userEvent.setup();
     const history = createMemoryHistory({
-      initialEntries: ['/gatekeeper/constrainttemplates/example-template'],
+      initialEntries: ['/gatekeeper/constraint-templates/example-template'],
     });
     const resource = {
       delete: vi.fn().mockResolvedValue(undefined),
@@ -59,7 +59,7 @@ describe('ConstraintTemplateDetails', () => {
 
     render(
       <Router history={history}>
-        <Route path="/gatekeeper/constrainttemplates/:name">
+        <Route path="/gatekeeper/constraint-templates/:name">
           <ConstraintTemplateDetails />
         </Route>
       </Router>
