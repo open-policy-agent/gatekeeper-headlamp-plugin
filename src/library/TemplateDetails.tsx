@@ -1,33 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { Loader, SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { KubeObjectInterface } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import {
+  Alert,
+  AlertTitle,
   Box,
   Button,
   CircularProgress,
   Paper,
+  Snackbar,
   TextField,
   Typography,
-  Snackbar,
-  Alert,
 } from '@mui/material';
-import {
-  SectionBox,
-  Loader,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import {
-  KubeObjectInterface,
-} from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import yaml from 'js-yaml';
-
-// Define a type for the structure of a library item (template)
-interface LibraryTemplateFromState {
-  id: string;
-  name: string;
-  description: string;
-  rawYAML: string;
-  sourceUrl: string;
-}
+import React, { useEffect, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
+import GitHubRequestControls from './GitHubRequestControls';
+import {
+  buildTemplateId,
+  buildTemplateSourceUrl,
+  fetchLibraryTemplate,
+  getErrorMessage,
+  isOfflineError,
+  isRateLimitOrAuthenticationError,
+  LibraryTemplate,
+  LibraryTemplateRoute,
+  resolveLibraryTemplateRoute,
+} from './libraryData';
 
 interface ConstraintTemplate extends KubeObjectInterface {
   spec: {
@@ -59,8 +58,208 @@ interface Constraint extends KubeObjectInterface {
   };
 }
 
-const CRD_ESTABLISHED_TIMEOUT_MS = 30000; // 30 seconds
-const CRD_POLL_INTERVAL_MS = 2000; // 2 seconds
+interface PreparedTemplate {
+  parsedTemplate: ConstraintTemplate;
+  constraintName: string;
+  constraintParams: string;
+}
+
+const CRD_ESTABLISHED_TIMEOUT_MS = 30000;
+const CRD_POLL_INTERVAL_MS = 2000;
+const SUPPORTED_CONSTRAINT_TEMPLATE_API_VERSIONS = new Set([
+  'templates.gatekeeper.sh/v1',
+  'templates.gatekeeper.sh/v1beta1',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeLocationTemplate(
+  locationState: unknown,
+  route: LibraryTemplateRoute
+): LibraryTemplate | null {
+  if (!isRecord(locationState) || !isRecord(locationState.template)) {
+    return null;
+  }
+
+  const template = locationState.template;
+  if (typeof template.rawYAML !== 'string' || !template.rawYAML.trim()) {
+    return null;
+  }
+
+  const id = typeof template.id === 'string' ? template.id : route.id;
+  const category = typeof template.category === 'string' ? template.category : route.category;
+  let templateName = typeof template.templateName === 'string' ? template.templateName : route.name;
+
+  if (!templateName && route.id && category && route.id.startsWith(`${category}-`)) {
+    templateName = route.id.slice(category.length + 1);
+  }
+
+  if (!category || !templateName) {
+    return null;
+  }
+
+  const canonicalId = buildTemplateId(category, templateName);
+  if (
+    (route.category && route.category !== category) ||
+    (route.name && route.name !== templateName) ||
+    (route.id && route.id !== canonicalId) ||
+    (id && id !== canonicalId)
+  ) {
+    return null;
+  }
+
+  return {
+    id: canonicalId,
+    category,
+    templateName,
+    name: typeof template.name === 'string' ? template.name : templateName,
+    description:
+      typeof template.description === 'string' ? template.description : 'No description available.',
+    sourceUrl:
+      typeof template.sourceUrl === 'string'
+        ? template.sourceUrl
+        : buildTemplateSourceUrl(category, templateName),
+    rawYAML: template.rawYAML,
+  };
+}
+
+function prepareTemplate(template: LibraryTemplate): PreparedTemplate {
+  const parsedDocuments = yaml.loadAll(template.rawYAML) as KubeObjectInterface[];
+  const constraintTemplate = parsedDocuments.find(
+    document => document && document.kind === 'ConstraintTemplate'
+  ) as ConstraintTemplate | undefined;
+
+  if (!constraintTemplate) {
+    throw new Error('Failed to find a ConstraintTemplate document in the template YAML.');
+  }
+
+  const names = constraintTemplate.spec?.crd?.spec?.names;
+  const originalKind = names?.kind;
+  if (!originalKind) {
+    throw new Error(
+      `Selected ConstraintTemplate (${
+        constraintTemplate.metadata.name || 'Unknown Name'
+      }) is malformed. It is missing "kind" under spec.crd.spec.names.`
+    );
+  }
+
+  let parsedTemplate = constraintTemplate;
+  if (!names.plural) {
+    const inferredPlural = originalKind.toLowerCase();
+    const mutableTemplate = JSON.parse(JSON.stringify(constraintTemplate)) as ConstraintTemplate;
+    mutableTemplate.spec.crd.spec.names.plural = inferredPlural;
+    parsedTemplate = mutableTemplate;
+  }
+
+  const exampleParams: Record<string, unknown> = {};
+  const properties = parsedTemplate.spec.crd.spec.validation?.openAPIV3Schema?.properties;
+  if (properties) {
+    for (const key in properties) {
+      if (properties[key].type === 'string') exampleParams[key] = 'exampleValue';
+      else if (properties[key].type === 'integer' || properties[key].type === 'number') {
+        exampleParams[key] = 123;
+      } else if (properties[key].type === 'boolean') exampleParams[key] = true;
+      else if (properties[key].type === 'array') exampleParams[key] = ['item1', 'item2'];
+      else if (properties[key].type === 'object') exampleParams[key] = { prop: 'value' };
+      else exampleParams[key] = null;
+    }
+  }
+
+  return {
+    parsedTemplate,
+    constraintName: `my-${parsedTemplate.metadata.name?.toLowerCase() || template.id}-constraint`,
+    constraintParams: JSON.stringify(exampleParams, null, 2),
+  };
+}
+
+function buildConstraintTemplateApiUrl(apiVersion: string, name?: string): string {
+  if (!SUPPORTED_CONSTRAINT_TEMPLATE_API_VERSIONS.has(apiVersion)) {
+    throw new Error(
+      `Unsupported ConstraintTemplate apiVersion "${apiVersion}". Supported versions are templates.gatekeeper.sh/v1 and templates.gatekeeper.sh/v1beta1.`
+    );
+  }
+
+  const collectionUrl = `/apis/${apiVersion}/constrainttemplates`;
+  return name ? `${collectionUrl}/${encodeURIComponent(name)}` : collectionUrl;
+}
+
+function normalizeSemanticValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeSemanticValue);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .filter(key => value[key] !== undefined)
+      .map(key => [key, normalizeSemanticValue(value[key])])
+  );
+}
+
+function constraintTemplateSpecsAreEquivalent(
+  desiredTemplate: KubeObjectInterface,
+  existingTemplate: unknown
+): boolean {
+  const desiredSpec = (desiredTemplate as KubeObjectInterface & { spec?: unknown }).spec;
+  const existingSpec = isRecord(existingTemplate) ? existingTemplate.spec : undefined;
+
+  if (desiredSpec === undefined || existingSpec === undefined) {
+    return false;
+  }
+
+  return (
+    JSON.stringify(normalizeSemanticValue(desiredSpec)) ===
+    JSON.stringify(normalizeSemanticValue(existingSpec))
+  );
+}
+
+function getApiErrorStatus(error: unknown): number | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+  return typeof error.status === 'number' ? error.status : undefined;
+}
+
+function getApiErrorDetail(error: unknown): string {
+  if (isRecord(error) && isRecord(error.json) && typeof error.json.message === 'string') {
+    return error.json.message;
+  }
+  return getErrorMessage(error);
+}
+
+function describeCRDReadFailure(crdName: string, error: unknown): string {
+  const status = getApiErrorStatus(error);
+  const detail = getApiErrorDetail(error);
+  const detailSuffix = detail ? ` Kubernetes reported: ${detail}` : '';
+
+  if (status === 401) {
+    return `authentication failed (401) while reading CRD "${crdName}".${detailSuffix}`;
+  }
+  if (status === 403) {
+    return `access was denied (403) while reading CRD "${crdName}". Grant permission to get customresourcedefinitions.apiextensions.k8s.io.${detailSuffix}`;
+  }
+  if (status === 408) {
+    return `the CRD status request timed out (408) while reading "${crdName}".${detailSuffix}`;
+  }
+  if (status === 502 && detail.toLowerCase().includes('unreachable')) {
+    return `a network or Headlamp proxy failure occurred while reading CRD "${crdName}" (502 Unreachable).${detailSuffix}`;
+  }
+  if (status !== undefined && status >= 500) {
+    return `the Kubernetes API or Headlamp proxy returned a server error (${status}) while reading CRD "${crdName}".${detailSuffix}`;
+  }
+  if (status === undefined && (error instanceof TypeError || isOfflineError(error))) {
+    return `a network error occurred while reading CRD "${crdName}".${detailSuffix}`;
+  }
+
+  return `the CRD status request failed${
+    status === undefined ? '' : ` (${status})`
+  } while reading "${crdName}".${detailSuffix}`;
+}
 
 async function checkCRDEstablished(crdName: string): Promise<boolean> {
   try {
@@ -68,43 +267,48 @@ async function checkCRDEstablished(crdName: string): Promise<boolean> {
       `/apis/apiextensions.k8s.io/v1/customresourcedefinitions/${crdName}`,
       { method: 'GET' }
     );
-    if (crd && crd.status && crd.status.conditions) {
+    if (crd?.status?.conditions) {
       const establishedCondition = crd.status.conditions.find(
-        (condition: any) => condition.type === 'Established' && condition.status === 'True'
+        (condition: unknown) =>
+          isRecord(condition) && condition.type === 'Established' && condition.status === 'True'
       );
-      return !!establishedCondition;
+      return Boolean(establishedCondition);
     }
-  } catch (e: any) {
-    // CRD might not be found yet, which is fine during polling
-    if (e.status !== 404) {
-      console.error(`Error checking CRD ${crdName} status:`, e);
+  } catch (error) {
+    if (getApiErrorStatus(error) === 404) {
+      return false;
     }
+    throw new Error(describeCRDReadFailure(crdName, error));
   }
   return false;
 }
 
 function LibraryTemplateDetails() {
-  const { id: templateRouteId } = useParams<{ id: string }>();
+  const { category, name, id } = useParams<{
+    category?: string;
+    name?: string;
+    id?: string;
+  }>();
   const location = useLocation();
-  const state = location.state as { template: LibraryTemplateFromState }; // Type assertion for state
-
-  const [libraryTemplateItem, setLibraryTemplateItem] = useState<LibraryTemplateFromState | null>(null);
+  const [libraryTemplateItem, setLibraryTemplateItem] = useState<LibraryTemplate | null>(null);
   const [parsedTemplate, setParsedTemplate] = useState<ConstraintTemplate | null>(null);
-  const [constraintName, setConstraintName] = useState<string>('');
-  const [constraintParams, setConstraintParams] = useState<string>('{}');
-  const [matchCriteria, setMatchCriteria] = useState<string>(
+  const [constraintName, setConstraintName] = useState('');
+  const [constraintParams, setConstraintParams] = useState('{}');
+  const [matchCriteria, setMatchCriteria] = useState(
     JSON.stringify(
       {
-        kinds: [{ apiGroups: [''], kinds: ['Pod'] }], // Default to matching Pods in core group
+        kinds: [{ apiGroups: [''], kinds: ['Pod'] }],
       },
       null,
       2
     )
   );
   const [generatedConstraintYAML, setGeneratedConstraintYAML] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [applying, setApplying] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [loadRevision, setLoadRevision] = useState(0);
   const [snackbarState, setSnackbarState] = useState<{
     open: boolean;
     message: string;
@@ -116,299 +320,303 @@ function LibraryTemplateDetails() {
   });
 
   useEffect(() => {
-    if (state && state.template && state.template.id === templateRouteId) {
-      setLibraryTemplateItem(state.template);
-      if (state.template.rawYAML) {
-        console.log('[TemplateDetails] Raw YAML:', state.template.rawYAML); // Log raw YAML
-        try {
-          const parsedDocs = yaml.loadAll(state.template.rawYAML) as KubeObjectInterface[];
-          console.log('[TemplateDetails] Parsed YAML docs:', parsedDocs); // Log parsed docs
+    let active = true;
+    const route = { category, name, id };
 
-          if (parsedDocs && parsedDocs.length > 0) {
-            const constraintTemplateDoc = parsedDocs.find(
-              doc => doc && doc.kind === 'ConstraintTemplate'
-            ) as ConstraintTemplate | undefined;
-            console.log('[TemplateDetails] Found ConstraintTemplate doc:', constraintTemplateDoc); // Log found CT doc
+    const loadTemplate = async () => {
+      setLoading(true);
+      setLoadError(null);
+      setFormError(null);
+      setLibraryTemplateItem(null);
+      setParsedTemplate(null);
+      setGeneratedConstraintYAML(null);
 
-            if (constraintTemplateDoc) {
-              // Log the nested properties step-by-step
-              console.log('[TemplateDetails] CT doc spec:', constraintTemplateDoc.spec);
-              if (constraintTemplateDoc.spec) {
-                console.log('[TemplateDetails] CT doc spec.crd:', constraintTemplateDoc.spec.crd);
-                if (constraintTemplateDoc.spec.crd) {
-                  console.log('[TemplateDetails] CT doc spec.crd.spec:', constraintTemplateDoc.spec.crd.spec);
-                  if (constraintTemplateDoc.spec.crd.spec) {
-                    console.log('[TemplateDetails] CT doc spec.crd.spec.names:', constraintTemplateDoc.spec.crd.spec.names);
-                  }
-                }
-              }
-
-              const names = constraintTemplateDoc.spec?.crd?.spec?.names;
-              const originalKind = names?.kind;
-              const originalPlural = names?.plural;
-
-              if (!originalKind) {
-                const errorMessage = `Selected ConstraintTemplate (${constraintTemplateDoc.metadata.name || 'Unknown Name'}) is malformed. It's missing 'kind' under spec.crd.spec.names. This field is essential. Please check the template definition from the library.`;
-                console.error('[TemplateDetails] Malformed ConstraintTemplate:', errorMessage, constraintTemplateDoc);
-                setError(errorMessage);
-                setParsedTemplate(null);
-              } else {
-                let templateToUse = constraintTemplateDoc;
-                let currentError = null; // Store potential error locally before setting state
-
-                if (!originalPlural) {
-                  const inferredPlural = originalKind.toLowerCase(); // Use lowercase kind directly
-                  console.warn(
-                    `[TemplateDetails] ConstraintTemplate (${constraintTemplateDoc.metadata.name || 'Unknown Name'}) is missing 'plural' under spec.crd.spec.names. Inferring as '${inferredPlural}' (lowercase of kind). This may not always be correct. Consider updating the template definition in the library.`
-                  );
-                  // Create a mutable deep copy to avoid modifying the original object from parsedDocs
-                  const mutableTemplateDoc = JSON.parse(JSON.stringify(constraintTemplateDoc)) as ConstraintTemplate;
-                  // Ensure path exists before assignment (it should, as originalKind exists)
-                  if (mutableTemplateDoc.spec && mutableTemplateDoc.spec.crd && mutableTemplateDoc.spec.crd.spec && mutableTemplateDoc.spec.crd.spec.names) {
-                    mutableTemplateDoc.spec.crd.spec.names.plural = inferredPlural;
-                  }
-                  templateToUse = mutableTemplateDoc;
-                } else {
-                  // Both kind and plural are present
-                }
-
-                setError(currentError); // Set error state (null if plural was inferred or already present)
-                setParsedTemplate(templateToUse);
-                setConstraintName(
-                  `my-${templateToUse.metadata.name?.toLowerCase() || state.template.id}-constraint`
-                );
-
-                // Pre-fill example parameters based on schema
-                if (templateToUse.spec?.crd?.spec?.validation?.openAPIV3Schema?.properties) {
-                  const exampleParams: Record<string, any> = {};
-                  const props = templateToUse.spec.crd.spec.validation.openAPIV3Schema.properties;
-                  for (const key in props) {
-                    if (props[key].type === 'string') exampleParams[key] = 'exampleValue';
-                    else if (props[key].type === 'integer' || props[key].type === 'number') exampleParams[key] = 123;
-                    else if (props[key].type === 'boolean') exampleParams[key] = true;
-                    else if (props[key].type === 'array') exampleParams[key] = ['item1', 'item2'];
-                    else if (props[key].type === 'object') exampleParams[key] = { prop: 'value' };
-                    else exampleParams[key] = null;
-                  }
-                  setConstraintParams(JSON.stringify(exampleParams, null, 2));
-                } else {
-                  setConstraintParams('{}');
-                }
-              }
-            } else {
-              setError('Failed to find a ConstraintTemplate document in the provided YAML.');
-              setParsedTemplate(null); // Ensure if no CT doc, parsedTemplate is also null
+      try {
+        const stateTemplate = normalizeLocationTemplate(location.state, route);
+        const resolvedRoute = stateTemplate
+          ? {
+              category: stateTemplate.category,
+              templateName: stateTemplate.templateName,
+              id: stateTemplate.id,
             }
-          } else {
-            setError('Failed to parse ConstraintTemplate YAML: No documents found.');
-          }
-        } catch (e: any) {
-          setError(`Failed to parse ConstraintTemplate YAML: ${e.message}`);
+          : await resolveLibraryTemplateRoute(route);
+        const template =
+          stateTemplate ??
+          (await fetchLibraryTemplate(resolvedRoute.category, resolvedRoute.templateName));
+        const prepared = prepareTemplate(template);
+
+        if (!active) {
+          return;
         }
-      } else {
-        setError('No rawYAML found in template data.');
+
+        setLibraryTemplateItem(template);
+        setParsedTemplate(prepared.parsedTemplate);
+        setConstraintName(prepared.constraintName);
+        setConstraintParams(prepared.constraintParams);
+      } catch (error) {
+        if (active) {
+          setLoadError(error);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-    } else {
-      setError('Template data not found or ID mismatch.');
-    }
-    setLoading(false);
-  }, [state, templateRouteId]);
+    };
+
+    void loadTemplate();
+    return () => {
+      active = false;
+    };
+  }, [category, id, loadRevision, location.state, name]);
+
+  const retryLoad = () => {
+    setLoadRevision(revision => revision + 1);
+  };
 
   const handleGenerateConstraint = () => {
     if (!parsedTemplate) {
-      setError('Cannot generate constraint: ConstraintTemplate not parsed.');
+      setFormError('Cannot generate constraint: ConstraintTemplate not parsed.');
       return;
     }
     if (!constraintName.trim()) {
-      setError('Constraint Name is required.');
+      setFormError('Constraint Name is required.');
       return;
     }
 
-    let paramsObj;
+    let paramsObject: unknown;
     try {
-      paramsObj = JSON.parse(constraintParams);
-    } catch (e: any) {
-      setError(`Invalid JSON in parameters: ${e.message}`);
+      paramsObject = JSON.parse(constraintParams);
+    } catch (error) {
+      setFormError(`Invalid JSON in parameters: ${getErrorMessage(error)}`);
       setGeneratedConstraintYAML(null);
       return;
     }
 
-    let matchObj;
+    let matchObject: unknown;
     try {
-      matchObj = JSON.parse(matchCriteria);
-    } catch (e: any) {
-      setError(`Invalid JSON in match criteria: ${e.message}`);
+      matchObject = JSON.parse(matchCriteria);
+    } catch (error) {
+      setFormError(`Invalid JSON in match criteria: ${getErrorMessage(error)}`);
       setGeneratedConstraintYAML(null);
       return;
     }
 
-    const constraintCR: Omit<Constraint, 'status'> = {
-      apiVersion: `constraints.gatekeeper.sh/v1beta1`,
+    const constraintResource: Omit<Constraint, 'status'> = {
+      apiVersion: 'constraints.gatekeeper.sh/v1beta1',
       kind: parsedTemplate.spec.crd.spec.names.kind,
       metadata: {
         name: constraintName,
       },
       spec: {
-        parameters: paramsObj,
-        match: matchObj,
+        parameters: paramsObject,
+        match: matchObject,
       },
     };
 
     try {
-      const yamlOutput = yaml.dump(constraintCR);
-      setGeneratedConstraintYAML(yamlOutput);
-      setError(null); // Clear previous errors
-    } catch (e: any) {
-      setError(`Failed to generate Constraint YAML: ${e.message}`);
+      setGeneratedConstraintYAML(yaml.dump(constraintResource));
+      setFormError(null);
+    } catch (error) {
+      setFormError(`Failed to generate Constraint YAML: ${getErrorMessage(error)}`);
       setGeneratedConstraintYAML(null);
     }
   };
 
   const handleApplyTemplateAndConstraint = async () => {
     if (!libraryTemplateItem?.rawYAML || !generatedConstraintYAML || !parsedTemplate) {
-      setSnackbarState({ open: true, message: 'Missing template YAML or generated constraint YAML.', severity: 'error' });
+      setSnackbarState({
+        open: true,
+        message: 'Missing template YAML or generated constraint YAML.',
+        severity: 'error',
+      });
       return;
     }
 
-    // Ensure pluralPath is valid before proceeding (already validated in useEffect, but good for safety)
-    const pluralPath = parsedTemplate?.spec?.crd?.spec?.names?.plural;
+    const pluralPath = parsedTemplate.spec.crd.spec.names.plural;
     if (!pluralPath) {
-      const errorMessage = `Cannot apply: ConstraintTemplate (${parsedTemplate?.metadata?.name}) is missing the required 'plural' name under spec.crd.spec.names.`;
-      console.error('[TemplateDetails] Apply error:', errorMessage, parsedTemplate);
-      setSnackbarState({ open: true, message: errorMessage, severity: 'error' });
+      setSnackbarState({
+        open: true,
+        message: `Cannot apply: ConstraintTemplate (${parsedTemplate.metadata.name}) is missing the required plural name.`,
+        severity: 'error',
+      });
       return;
     }
 
     setApplying(true);
-    setSnackbarState(prev => ({ ...prev, open: false }));
-
-    // Define successMessage here to be accessible in the whole try block
-    let successMessage = '';
+    setSnackbarState(previous => ({ ...previous, open: false }));
 
     try {
-      // 1. Apply ConstraintTemplate
-      let templateObjToApply: any;
+      let templateObjectToApply: KubeObjectInterface | undefined;
       try {
-        // We need to find the ConstraintTemplate document specifically if rawYAML contains multiple docs
-        const parsedDocs = yaml.loadAll(libraryTemplateItem.rawYAML) as KubeObjectInterface[];
-        templateObjToApply = parsedDocs.find(doc => doc && doc.kind === 'ConstraintTemplate');
-        if (!templateObjToApply) {
+        const parsedDocuments = yaml.loadAll(libraryTemplateItem.rawYAML) as KubeObjectInterface[];
+        templateObjectToApply = parsedDocuments.find(
+          document => document && document.kind === 'ConstraintTemplate'
+        );
+        if (!templateObjectToApply) {
           throw new Error('ConstraintTemplate document not found in the provided YAML.');
         }
-      } catch (e: any) {
-        throw new Error(`Invalid ConstraintTemplate YAML: ${e.message}`);
+      } catch (error) {
+        throw new Error(`Invalid ConstraintTemplate YAML: ${getErrorMessage(error)}`);
       }
 
-      if (!templateObjToApply || !templateObjToApply.kind || !templateObjToApply.apiVersion) {
+      const templateName = templateObjectToApply.metadata?.name;
+      if (!templateObjectToApply.kind || !templateObjectToApply.apiVersion || !templateName) {
         throw new Error('Parsed template YAML is not a valid Kubernetes object.');
       }
 
+      const templateCollectionUrl = buildConstraintTemplateApiUrl(templateObjectToApply.apiVersion);
+      let templateApplyOutcome: 'was applied' | 'already existed' = 'was applied';
       try {
-        await ApiProxy.request(
-          `/apis/templates.gatekeeper.sh/v1/constrainttemplates`, // Using v1 as per Gatekeeper docs for CTs
-          {
-            method: 'POST',
-            body: JSON.stringify(templateObjToApply),
-            headers: { 'Content-Type': 'application/json' },
+        await ApiProxy.request(templateCollectionUrl, {
+          method: 'POST',
+          body: JSON.stringify(templateObjectToApply),
+          headers: { 'Content-Type': 'application/json' },
+        });
+        setSnackbarState({
+          open: true,
+          message: 'ConstraintTemplate applied successfully. Waiting for CRD establishment...',
+          severity: 'info',
+        });
+      } catch (error) {
+        if (getApiErrorStatus(error) === 409) {
+          const existingTemplate = await ApiProxy.request(
+            buildConstraintTemplateApiUrl(templateObjectToApply.apiVersion, templateName),
+            { method: 'GET' }
+          );
+          if (!constraintTemplateSpecsAreEquivalent(templateObjectToApply, existingTemplate)) {
+            throw new Error(
+              `ConstraintTemplate ${templateName} already exists, but its spec is not semantically equivalent to the Policy Library template. Review or remove the existing template before applying. The Constraint was not created.`
+            );
           }
-        );
-        successMessage = "ConstraintTemplate applied successfully! Waiting for CRD to be established... ";
-        setSnackbarState({ open: true, message: successMessage, severity: 'info' });
-      } catch (ctError: any) {
-        if (ctError.status === 409) { // HTTP 409 Conflict
-          console.warn(`ConstraintTemplate ${templateObjToApply.metadata.name} already exists. Proceeding to CRD check and Constraint application.`);
-          successMessage = `ConstraintTemplate ${templateObjToApply.metadata.name} already exists. Checking CRD...`;
-          setSnackbarState({ open: true, message: successMessage, severity: 'warning' });
+
+          templateApplyOutcome = 'already existed';
+          setSnackbarState({
+            open: true,
+            message: `ConstraintTemplate ${templateName} already exists with an equivalent spec. Checking CRD...`,
+            severity: 'warning',
+          });
         } else {
-          throw ctError; // Re-throw other errors
+          throw error;
         }
       }
 
-      // 2. Poll for CRD readiness
+      const partialApplyPrefix = `ConstraintTemplate ${templateName} ${templateApplyOutcome}`;
       const crdName = `${pluralPath}.constraints.gatekeeper.sh`;
       let crdEstablished = false;
       const startTime = Date.now();
 
-      while (Date.now() - startTime < CRD_ESTABLISHED_TIMEOUT_MS) {
-        if (await checkCRDEstablished(crdName)) {
-          crdEstablished = true;
-          break;
+      try {
+        while (Date.now() - startTime < CRD_ESTABLISHED_TIMEOUT_MS) {
+          if (await checkCRDEstablished(crdName)) {
+            crdEstablished = true;
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, CRD_POLL_INTERVAL_MS));
         }
-        await new Promise(resolve => setTimeout(resolve, CRD_POLL_INTERVAL_MS));
+      } catch (error) {
+        throw new Error(
+          `${partialApplyPrefix}, but ${getErrorMessage(error)} The Constraint was not created.`
+        );
       }
 
       if (!crdEstablished) {
-        throw new Error(`CRD ${crdName} was not established within ${CRD_ESTABLISHED_TIMEOUT_MS / 1000} seconds.`);
+        throw new Error(
+          `${partialApplyPrefix}, but CRD ${crdName} was not established within ${
+            CRD_ESTABLISHED_TIMEOUT_MS / 1000
+          } seconds. The Constraint was not created.`
+        );
       }
-      successMessage = `ConstraintTemplate applied & CRD ${crdName} established. Applying constraint...`;
-      setSnackbarState({ open: true, message: successMessage, severity: 'info' });
 
-      // 3. Apply Constraint
-      let constraintObjToApply: any;
+      setSnackbarState({
+        open: true,
+        message: `ConstraintTemplate applied and CRD ${crdName} established. Applying constraint...`,
+        severity: 'info',
+      });
+
+      let constraintObjectToApply: any;
       try {
-        constraintObjToApply = yaml.load(generatedConstraintYAML);
-      } catch (e: any) {
-        throw new Error(`Invalid generated Constraint YAML: ${e.message}`);
+        constraintObjectToApply = yaml.load(generatedConstraintYAML);
+      } catch (error) {
+        throw new Error(`Invalid generated Constraint YAML: ${getErrorMessage(error)}`);
       }
 
-      if (!constraintObjToApply || !constraintObjToApply.kind || !constraintObjToApply.apiVersion) {
+      if (
+        !constraintObjectToApply ||
+        !constraintObjectToApply.kind ||
+        !constraintObjectToApply.apiVersion
+      ) {
         throw new Error('Parsed constraint YAML is not a valid Kubernetes object.');
       }
 
-      const constraintPlural = pluralPath.toLowerCase(); // Already validated that pluralPath exists
-      const constraintApiVersion = constraintObjToApply.apiVersion;
-      const constraintPostUrl = `/apis/${constraintApiVersion}/${constraintPlural}`;
-
-      await ApiProxy.request(
-        constraintPostUrl,
-        {
-          method: 'POST',
-          body: JSON.stringify(constraintObjToApply),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-      successMessage = "ConstraintTemplate and Constraint applied successfully!";
-      setSnackbarState({ open: true, message: successMessage, severity: 'success' });
-
-    } catch (err: any) {
-      let errorMessage = err.message || 'Unknown error';
-      if (err.json && err.json.message) {
-        errorMessage = err.json.message;
-      }
-      setSnackbarState({ open: true, message: `Failed to apply: ${errorMessage}`, severity: 'error' });
+      const constraintPostUrl = `/apis/${
+        constraintObjectToApply.apiVersion
+      }/${pluralPath.toLowerCase()}`;
+      await ApiProxy.request(constraintPostUrl, {
+        method: 'POST',
+        body: JSON.stringify(constraintObjectToApply),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      setSnackbarState({
+        open: true,
+        message: 'ConstraintTemplate and Constraint applied successfully!',
+        severity: 'success',
+      });
+    } catch (error: any) {
+      const errorMessage = error.json?.message || getErrorMessage(error) || 'Unknown error';
+      setSnackbarState({
+        open: true,
+        message: `Failed to apply: ${errorMessage}`,
+        severity: 'error',
+      });
     } finally {
       setApplying(false);
     }
   };
 
-  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
-    if (reason === 'clickaway') {
-      return;
+  const handleCloseSnackbar = (_event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason !== 'clickaway') {
+      setSnackbarState(previous => ({ ...previous, open: false }));
     }
-    setSnackbarState(prev => ({ ...prev, open: false }));
   };
 
   if (loading) {
-    return <CircularProgress />;
+    return (
+      <SectionBox title="Library Template Details">
+        <Loader title="Loading library template..." />
+      </SectionBox>
+    );
   }
 
-  if (!libraryTemplateItem || !libraryTemplateItem.rawYAML || (error && !parsedTemplate)) {
+  if (loadError || !libraryTemplateItem || !parsedTemplate) {
+    const offline = isOfflineError(loadError);
     return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h5" gutterBottom>
-          Library Template Details
-        </Typography>
-        <Typography color="error">{error || "Could not load template details."}</Typography>
-      </Box>
+      <SectionBox title="Library Template Details">
+        <Alert severity={offline ? 'warning' : 'error'} sx={{ mb: 2 }}>
+          <AlertTitle>{offline ? 'Unable to Reach GitHub' : 'Template Load Failed'}</AlertTitle>
+          {loadError ? getErrorMessage(loadError) : 'Could not load template details.'}
+        </Alert>
+        <Button variant="outlined" onClick={retryLoad} sx={{ mb: 2 }}>
+          Retry
+        </Button>
+        {isRateLimitOrAuthenticationError(loadError) && (
+          <GitHubRequestControls onRetry={retryLoad} />
+        )}
+      </SectionBox>
     );
   }
 
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h5" gutterBottom>
-              Library Template: {libraryTemplateItem.name}
+        Library Template: {libraryTemplateItem.name}
       </Typography>
-      {error && !parsedTemplate && <Typography color="error" gutterBottom>Error: {error}</Typography>}
+
+      {formError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {formError}
+        </Alert>
+      )}
 
       <SectionBox title="ConstraintTemplate Definition">
         <Paper elevation={2} sx={{ p: 1, overflowX: 'auto' }}>
@@ -418,69 +626,76 @@ function LibraryTemplateDetails() {
         </Paper>
       </SectionBox>
 
-      {parsedTemplate && (
-        <SectionBox title="Create Constraint from this Template" sx={{ mt: 2 }}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Constraint Details (Kind: {parsedTemplate.spec.crd.spec.names.kind})
-            </Typography>
-            <TextField
-              label="Constraint Name"
-              value={constraintName}
-              onChange={(e) => setConstraintName(e.target.value)}
-              fullWidth
-              margin="normal"
-              required
-              error={!constraintName.trim()}
-              helperText={!constraintName.trim() ? "Constraint name is required." : ""}
-            />
+      <SectionBox title="Create Constraint from this Template" sx={{ mt: 2 }}>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Constraint Details (Kind: {parsedTemplate.spec.crd.spec.names.kind})
+          </Typography>
+          <TextField
+            label="Constraint Name"
+            value={constraintName}
+            onChange={event => {
+              setConstraintName(event.target.value);
+              setGeneratedConstraintYAML(null);
+            }}
+            fullWidth
+            margin="normal"
+            required
+            error={!constraintName.trim()}
+            helperText={!constraintName.trim() ? 'Constraint name is required.' : ''}
+          />
 
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 0.5 }}>Match Criteria (JSON):</Typography>
-            <TextField
-              label="Match Criteria (JSON format)"
-              value={matchCriteria}
-              onChange={(e) => setMatchCriteria(e.target.value)}
-              multiline
-              rows={5}
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              InputProps={{
-                style: { fontFamily: 'monospace' }
-              }}
-            />
+          <Typography variant="subtitle1" sx={{ mt: 2, mb: 0.5 }}>
+            Match Criteria (JSON):
+          </Typography>
+          <TextField
+            label="Match Criteria (JSON format)"
+            value={matchCriteria}
+            onChange={event => {
+              setMatchCriteria(event.target.value);
+              setGeneratedConstraintYAML(null);
+            }}
+            multiline
+            rows={5}
+            fullWidth
+            margin="normal"
+            variant="outlined"
+            InputProps={{ style: { fontFamily: 'monospace' } }}
+          />
 
-            <Typography variant="subtitle1" sx={{ mt: 1, mb: 0.5 }}>Parameters (JSON):</Typography>
-            {parsedTemplate.spec.crd.spec.validation?.openAPIV3Schema?.properties && (
-              <Box mb={1}>
-                <TextField
-                  label="Parameters (JSON format)"
-                  value={constraintParams}
-                  onChange={(e) => setConstraintParams(e.target.value)}
-                  multiline
-                  rows={5}
-                  fullWidth
-                  margin="normal"
-                  variant="outlined"
-                  InputProps={{
-                    style: { fontFamily: 'monospace' }
-                  }}
-                />
-              </Box>
-            )}
+          <Typography variant="subtitle1" sx={{ mt: 1, mb: 0.5 }}>
+            Parameters (JSON):
+          </Typography>
+          {parsedTemplate.spec.crd.spec.validation?.openAPIV3Schema?.properties && (
+            <Box mb={1}>
+              <TextField
+                label="Parameters (JSON format)"
+                value={constraintParams}
+                onChange={event => {
+                  setConstraintParams(event.target.value);
+                  setGeneratedConstraintYAML(null);
+                }}
+                multiline
+                rows={5}
+                fullWidth
+                margin="normal"
+                variant="outlined"
+                InputProps={{ style: { fontFamily: 'monospace' } }}
+              />
+            </Box>
+          )}
 
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleGenerateConstraint}
-              sx={{ mt: 2, mr: 1 }}
-              disabled={!constraintName || !constraintParams || !matchCriteria || !parsedTemplate}
-            >
-              Preview Constraint YAML
-            </Button>
-          </Paper>
-        </SectionBox>
-      )}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGenerateConstraint}
+            sx={{ mt: 2, mr: 1 }}
+            disabled={!constraintName || !constraintParams || !matchCriteria}
+          >
+            Preview Constraint YAML
+          </Button>
+        </Paper>
+      </SectionBox>
 
       {generatedConstraintYAML && (
         <SectionBox title="Generated Constraint YAML" sx={{ mt: 2 }}>
@@ -492,19 +707,17 @@ function LibraryTemplateDetails() {
         </SectionBox>
       )}
 
-      {(libraryTemplateItem.rawYAML || generatedConstraintYAML) && parsedTemplate && (
-        <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'start' }}>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={handleApplyTemplateAndConstraint}
-            disabled={applying || !libraryTemplateItem.rawYAML || (parsedTemplate && !generatedConstraintYAML)}
-            startIcon={applying ? <CircularProgress size={20} /> : null}
-          >
-            {applying ? 'Applying...' : 'Apply Template & Constraint to Cluster'}
-          </Button>
-        </Box>
-      )}
+      <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'start' }}>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleApplyTemplateAndConstraint}
+          disabled={applying || !generatedConstraintYAML}
+          startIcon={applying ? <CircularProgress size={20} /> : null}
+        >
+          {applying ? 'Applying...' : 'Apply Template & Constraint to Cluster'}
+        </Button>
+      </Box>
 
       <Snackbar
         open={snackbarState.open}
@@ -512,7 +725,11 @@ function LibraryTemplateDetails() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarState.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbarState.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbarState.message}
         </Alert>
       </Snackbar>

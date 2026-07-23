@@ -5,7 +5,7 @@ export interface ConstraintTemplateSpec {
     spec: {
       names: {
         kind: string;
-        plural: string;
+        plural?: string;
       };
       validation?: {
         openAPIV3Schema?: any;
@@ -30,7 +30,7 @@ export interface ConstraintTemplateStatus {
 }
 
 export interface ConstraintTemplate {
-  apiVersion: 'templates.gatekeeper.sh/v1beta1';
+  apiVersion: 'templates.gatekeeper.sh/v1' | 'templates.gatekeeper.sh/v1beta1';
   kind: 'ConstraintTemplate';
   metadata: {
     name: string;

@@ -1,34 +1,31 @@
 import {
   Link as HeadlampLink,
   SectionBox,
+  SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Box,
-  Button,
   Alert,
   AlertTitle,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Typography,
 } from '@mui/material';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { RoutingPath } from '../index';
-import { ConstraintClass, ConstraintTemplateClass } from '../model';
+import { RouteName } from '../index';
+import { ConstraintClass, requestConstraintTemplates } from '../model';
 import { Constraint } from '../types';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ConstraintListProps {}
+interface ConstraintListProps {
+  hideTitle?: boolean;
+}
 
-function ConstraintList({}: ConstraintListProps) {
+function ConstraintList(props: ConstraintListProps) {
   const [constraints, setConstraints] = useState<any[] | null>(null);
   const [kindFilter, setKindFilter] = useState<string>('All');
   const [enforcementActionFilter, setEnforcementActionFilter] = useState<string>('All');
@@ -51,29 +48,15 @@ function ConstraintList({}: ConstraintListProps) {
   useEffect(() => {
     const checkGatekeeperCRD = async () => {
       try {
-        // Get the request function from ApiProxy
-        const apiProxyModule = ApiProxy as any;
-        let requestFunc: ((url: string) => Promise<any>) | undefined;
-
-        if (typeof apiProxyModule.request === 'function') {
-          requestFunc = apiProxyModule.request;
-        } else if (typeof apiProxyModule.default === 'function') {
-          requestFunc = apiProxyModule.default;
-        } else if (apiProxyModule.default && typeof apiProxyModule.default.request === 'function') {
-          requestFunc = apiProxyModule.default.request;
-        }
-
-        if (!requestFunc) {
-          console.error('[ConstraintList] Could not find API request function');
-          return;
-        }
-
-        // Try to fetch constraint templates - if this fails, Gatekeeper is likely not installed
-        await requestFunc('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+        await requestConstraintTemplates();
       } catch (error: any) {
         // Check if it's a 404 or connection error indicating CRD doesn't exist
-        if (error?.status === 404 || error?.message?.includes('404') ||
-            error?.message?.includes('not found') || error?.message?.includes('no matches')) {
+        if (
+          error?.status === 404 ||
+          error?.message?.includes('404') ||
+          error?.message?.includes('not found') ||
+          error?.message?.includes('no matches')
+        ) {
           console.log('[ConstraintList] Gatekeeper CRDs not found');
           setGatekeeperNotInstalled(true);
         }
@@ -105,7 +88,9 @@ function ConstraintList({}: ConstraintListProps) {
       .map(item => (item.jsonData || item) as Constraint)
       .filter(constraint => {
         const kindMatch = kindFilter === 'All' || constraint.kind === kindFilter;
-        const enforcementActionMatch = enforcementActionFilter === 'All' || (constraint.spec?.enforcementAction || 'warn') === enforcementActionFilter;
+        const enforcementActionMatch =
+          enforcementActionFilter === 'All' ||
+          (constraint.spec?.enforcementAction || 'warn') === enforcementActionFilter;
         return kindMatch && enforcementActionMatch;
       });
   }, [constraints, kindFilter, enforcementActionFilter]);
@@ -124,18 +109,14 @@ function ConstraintList({}: ConstraintListProps) {
     };
 
     return (
-      <SectionBox title="Constraints">
+      <SectionBox title={props.hideTitle ? undefined : 'Constraints'}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and constraints.
+            Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start
+            using policy enforcement and constraints.
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleInstallGatekeeper}
-          >
+          <Button variant="contained" color="primary" onClick={handleInstallGatekeeper}>
             Install Gatekeeper
           </Button>
         </Alert>
@@ -175,13 +156,11 @@ function ConstraintList({}: ConstraintListProps) {
     if (!item.spec?.match?.kinds) {
       return '';
     }
-    return item.spec.match.kinds
-      .map(kind => kind.kinds.join(', '))
-      .join('; ');
+    return item.spec.match.kinds.map(kind => kind.kinds.join(', ')).join('; ');
   }
 
   return (
-    <SectionBox title="Constraints">
+    <SectionBox title={props.hideTitle ? undefined : 'Constraints'}>
       <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 150 }} size="small">
           <InputLabel id="kind-filter-label">Kind</InputLabel>
@@ -189,10 +168,12 @@ function ConstraintList({}: ConstraintListProps) {
             labelId="kind-filter-label"
             value={kindFilter}
             label="Kind"
-            onChange={(e) => setKindFilter(e.target.value as string)}
+            onChange={e => setKindFilter(e.target.value as string)}
           >
             {uniqueKinds.map(kind => (
-              <MenuItem key={kind} value={kind}>{kind}</MenuItem>
+              <MenuItem key={kind} value={kind}>
+                {kind}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -202,53 +183,62 @@ function ConstraintList({}: ConstraintListProps) {
             labelId="enforcement-action-filter-label"
             value={enforcementActionFilter}
             label="Enforcement Action"
-            onChange={(e) => setEnforcementActionFilter(e.target.value as string)}
+            onChange={e => setEnforcementActionFilter(e.target.value as string)}
           >
             {uniqueEnforcementActions.map(action => (
-              <MenuItem key={action} value={action}>{action}</MenuItem>
+              <MenuItem key={action} value={action}>
+                {action}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
       </Box>
       {filteredConstraints.length === 0 ? (
         <Typography sx={{ padding: 2 }}>
-          {constraints.length > 0 ? 'No constraints match the current filters.' : 'No constraints found.'}
+          {constraints.length > 0
+            ? 'No constraints match the current filters.'
+            : 'No constraints found.'}
         </Typography>
       ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Kind</TableCell>
-                <TableCell>Enforcement Action</TableCell>
-                <TableCell>Matched Kinds</TableCell>
-                <TableCell>Violations</TableCell>
-                <TableCell>Age</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredConstraints.map((constraint) => (
-                <TableRow key={`${constraint.kind}-${constraint.metadata.name}`}>
-                  <TableCell>
-                    <HeadlampLink
-                      routeName={RoutingPath.Constraint}
-                      params={{
-                        kind: constraint.kind,
-                        name: constraint.metadata.name,
-                      }}
-                    >
-                      {constraint.metadata.name}
-                    </HeadlampLink>
-                  </TableCell>
-                  <TableCell>{constraint.kind}</TableCell>
-                  <TableCell>{makeEnforcementActionChip(constraint)}</TableCell>
-                  <TableCell>{getMatchedKinds(constraint)}</TableCell>
-                  <TableCell>{getViolationCount(constraint)}</TableCell>
-                  <TableCell>{constraint.metadata.creationTimestamp}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <SimpleTable
+          data={filteredConstraints}
+          columns={[
+            {
+              label: 'Name',
+              getter: constraint => (
+                <HeadlampLink
+                  routeName={RouteName.Constraint}
+                  params={{
+                    kind: constraint.kind,
+                    name: constraint.metadata.name,
+                  }}
+                >
+                  {constraint.metadata.name}
+                </HeadlampLink>
+              ),
+            },
+            {
+              label: 'Kind',
+              getter: constraint => constraint.kind,
+            },
+            {
+              label: 'Enforcement Action',
+              getter: constraint => makeEnforcementActionChip(constraint),
+            },
+            {
+              label: 'Target Kinds',
+              getter: constraint => getMatchedKinds(constraint) || '-',
+            },
+            {
+              label: 'Violations',
+              getter: constraint => getViolationCount(constraint),
+            },
+            {
+              label: 'Age',
+              getter: constraint => constraint.metadata.creationTimestamp,
+            },
+          ]}
+        />
       )}
     </SectionBox>
   );

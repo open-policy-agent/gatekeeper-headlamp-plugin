@@ -1,31 +1,34 @@
+import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import {
+  Alert,
   Box,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
   Button,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
   Snackbar,
-  Alert,
-  CircularProgress
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Typography,
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useParams, useHistory, useLocation } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
+import {
+  buildClusterRedirectPath,
+  isSameHistoryLocation,
+} from '../components/ResourceDeleteButton';
+import { ResourceDetailsError, ResourceDetailsLoading } from '../components/ResourceDetailsState';
+import { RoutingPath } from '../index';
 import { ConstraintClass } from '../model';
 import { Constraint } from '../types';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
-import { RoutingPath } from '../index';
 
 interface ConstraintDetailsProps {}
 
@@ -33,7 +36,6 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   const { kind, name } = useParams<{ kind: string; name: string }>();
   const [item, setItem] = useState<any | null>(null);
   const history = useHistory();
-  const location = useLocation();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -48,10 +50,20 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
     severity: 'info',
   });
 
-  ConstraintClass.useApiGet(setItem, name);
+  const { constraintPlural, error, loading } = ConstraintClass.useApiGet(setItem, name, kind);
 
-  if (!item) {
-    return <Typography>Loading constraint details...</Typography>;
+  if (error) {
+    return (
+      <ResourceDetailsError
+        error={error}
+        kind={kind ? `${kind} Constraint` : 'Constraint'}
+        name={name}
+      />
+    );
+  }
+
+  if (loading || !item) {
+    return <ResourceDetailsLoading kind="Constraint" />;
   }
 
   // Handle both KubeObject instances and raw constraint objects
@@ -66,117 +78,41 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   };
 
   const handleDeleteConfirm = async () => {
-    console.log('=== DELETE CONSTRAINT DEBUG START ===');
-    console.log('URL params - kind:', kind, 'name:', name);
-    console.log('constraint object:', constraint);
-    console.log('constraint.kind:', constraint?.kind);
+    const constraintName = constraint.metadata?.name;
+    const hasRouteMismatch = Boolean(
+      (kind && constraint.kind !== kind) || (name && constraintName !== name)
+    );
 
-    if (!name || !constraint) {
-      console.error('Cannot delete: name or constraint is missing', { name, constraint });
+    if (!constraintPlural || !constraintName || hasRouteMismatch) {
       setSnackbarState({
         open: true,
-        message: 'Cannot delete: missing constraint information',
+        message: 'Cannot delete: the loaded constraint does not match this route',
         severity: 'error',
       });
       return;
     }
 
-    console.log('Starting delete process for constraint:', { name, urlKind: kind, constraintKind: constraint.kind });
+    const deleteLocation = history.location;
     setIsDeleting(true);
     setDeleteDialogOpen(false);
 
     try {
-      // The 'kind' parameter from the URL is actually the plural form used in the API
-      // But if it's not available, we need to determine it from ConstraintTemplates
-      let constraintPlural = kind ? kind.toLowerCase() : '';
+      const deleteUrl = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${constraintName}`;
 
-      // If kind from URL is not available or seems like a singular form, try to get the correct plural from ConstraintTemplates
-      if (!constraintPlural || constraintPlural === constraint.kind.toLowerCase()) {
-        try {
-          console.log('Fetching ConstraintTemplates to determine plural form...');
-          const templatesResponse = await ApiProxy.request('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
-          console.log('ConstraintTemplates response:', templatesResponse);
+      await ApiProxy.request(deleteUrl, {
+        method: 'DELETE',
+      });
 
-          if (templatesResponse && templatesResponse.items) {
-            const matchingTemplate = templatesResponse.items.find((template: any) =>
-              template.spec?.crd?.spec?.names?.kind === constraint.kind
-            );
-
-            if (matchingTemplate && matchingTemplate.spec?.crd?.spec?.names?.plural) {
-              constraintPlural = matchingTemplate.spec.crd.spec.names.plural.toLowerCase();
-              console.log(`Found matching template with plural: ${constraintPlural}`);
-            } else {
-              console.warn(`No matching template found for kind: ${constraint.kind}`);
-            }
-          }
-        } catch (templateError: any) {
-          console.warn('Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization', templateError);
-        }
-      }
-
-      // Fallback to simple pluralization if we couldn't get it from ConstraintTemplates
-      if (!constraintPlural) {
-        const constraintKind = constraint.kind.toLowerCase();
-        console.log(`Using fallback pluralization for kind: ${constraintKind}`);
-
-        if (constraintKind.endsWith('y')) {
-          constraintPlural = constraintKind.slice(0, -1) + 'ies';
-        } else if (constraintKind.endsWith('s') || constraintKind.endsWith('sh') || constraintKind.endsWith('ch') || constraintKind.endsWith('x') || constraintKind.endsWith('z')) {
-          constraintPlural = constraintKind + 'es';
-        } else {
-          constraintPlural = constraintKind + 's';
-        }
-        console.log(`Computed plural form: ${constraintPlural}`);
-      }
-
-      if (!constraintPlural) {
-        throw new Error(`Could not determine plural form for constraint kind: ${constraint.kind}`);
-      }
-
-      if (!name) {
-        throw new Error('Constraint name is missing');
-      }
-
-      const deleteUrl = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${name}`;
-      console.log(`Attempting to delete constraint with URL: ${deleteUrl}`);
-      console.log(`Full URL parts - plural: "${constraintPlural}", name: "${name}"`);
-
-      await ApiProxy.request(
-        deleteUrl,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      console.log('Delete request successful');
       setSnackbarState({
         open: true,
-        message: `Constraint "${name}" deleted successfully`,
+        message: `Constraint "${constraintName}" deleted successfully`,
         severity: 'success',
       });
 
-      // Navigate back to constraints list after a short delay
-      setTimeout(() => {
-        // Extract cluster from current URL (format: /c/:cluster/...)
-        const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
-        const cluster = clusterMatch ? clusterMatch[1] : null;
-        
-        if (cluster) {
-          history.push(`/c/${cluster}${RoutingPath.Constraints}`);
-        } else {
-          history.push(RoutingPath.Constraints);
-        }
-      }, 1500);
-
+      if (isSameHistoryLocation(history.location, deleteLocation)) {
+        history.replace(buildClusterRedirectPath(deleteLocation.pathname, RoutingPath.Constraints));
+      }
     } catch (error: any) {
-      console.error('Failed to delete constraint:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        json: error.json,
-        response: error.response
-      });
-
       let errorMessage = 'Failed to delete Constraint';
       if (error.json && error.json.message) {
         errorMessage = `Failed to delete Constraint: ${error.json.message}`;
@@ -285,7 +221,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   }
 
   return (
-    <Box>
+    <Box sx={{ pt: 2, pb: 2 }}>
       {/* Header with title and delete button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
@@ -311,7 +247,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -332,7 +268,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {getMatchRules().map((row) => (
+            {getMatchRules().map(row => (
               <TableRow key={row.Index}>
                 <TableCell>{row.Property}</TableCell>
                 <TableCell>{row.Value}</TableCell>
@@ -352,7 +288,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {getViolationRows().map((row) => (
+            {getViolationRows().map(row => (
               <TableRow key={row.Index}>
                 <TableCell>{row.Resource}</TableCell>
                 <TableCell>{row.Namespace}</TableCell>
@@ -370,13 +306,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
       >
-        <DialogTitle id="delete-dialog-title">
-          Delete Constraint
-        </DialogTitle>
+        <DialogTitle id="delete-dialog-title">Delete Constraint</DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete the {constraint.kind} constraint "{constraint.metadata.name}"?
-            This action cannot be undone.
+            Are you sure you want to delete the {constraint.kind} constraint "
+            {constraint.metadata.name}"? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -396,7 +330,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarState.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbarState.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbarState.message}
         </Alert>
       </Snackbar>

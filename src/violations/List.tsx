@@ -2,34 +2,32 @@ import {
   Link,
   Loader,
   SectionBox,
+  SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
-  Chip,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  Box, // Added Box
-  Select, // Added Select
-  MenuItem, // Added MenuItem
-  FormControl, // Added FormControl
-  InputLabel, // Added InputLabel
-  TextField, // Added TextField
-  Button,
   Alert,
   AlertTitle,
+  Box, // Added Box
+  Button,
+  Chip,
+  FormControl, // Added FormControl
+  InputLabel, // Added InputLabel
+  MenuItem, // Added MenuItem
+  Paper,
+  Select, // Added Select
+  TableContainer,
+  TextField, // Added TextField
+  Typography,
 } from '@mui/material';
-import React, { useState, useMemo, useEffect } from 'react'; // Added useMemo, useEffect
+import React, { useEffect, useMemo, useState } from 'react'; // Added useMemo, useEffect
 import { useHistory, useLocation } from 'react-router-dom';
-import { ConstraintClass } from '../model';
+import { RouteName } from '../index';
+import { ConstraintClass, requestConstraintTemplates } from '../model';
 import { Constraint, Violation } from '../types';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ViolationsListProps {}
+interface ViolationsListProps {
+  hideTitle?: boolean;
+}
 
 interface ViolationWithConstraint extends Violation {
   constraintName: string;
@@ -37,7 +35,7 @@ interface ViolationWithConstraint extends Violation {
   enforcementAction: string;
 }
 
-function ViolationsList({}: ViolationsListProps) {
+function ViolationsList(props: ViolationsListProps) {
   const [constraintObjects, setConstraintObjects] = useState<any[] | null>(null);
   // Filter states
   const [resourceKindFilter, setResourceKindFilter] = useState<string>('All');
@@ -67,29 +65,15 @@ function ViolationsList({}: ViolationsListProps) {
   useEffect(() => {
     const checkGatekeeperCRD = async () => {
       try {
-        // Get the request function from ApiProxy
-        const apiProxyModule = ApiProxy as any;
-        let requestFunc: ((url: string) => Promise<any>) | undefined;
-
-        if (typeof apiProxyModule.request === 'function') {
-          requestFunc = apiProxyModule.request;
-        } else if (typeof apiProxyModule.default === 'function') {
-          requestFunc = apiProxyModule.default;
-        } else if (apiProxyModule.default && typeof apiProxyModule.default.request === 'function') {
-          requestFunc = apiProxyModule.default.request;
-        }
-
-        if (!requestFunc) {
-          console.error('[ViolationsList] Could not find API request function');
-          return;
-        }
-
-        // Try to fetch constraint templates - if this fails, Gatekeeper is likely not installed
-        await requestFunc('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+        await requestConstraintTemplates();
       } catch (error: any) {
         // Check if it's a 404 or connection error indicating CRD doesn't exist
-        if (error?.status === 404 || error?.message?.includes('404') ||
-            error?.message?.includes('not found') || error?.message?.includes('no matches')) {
+        if (
+          error?.status === 404 ||
+          error?.message?.includes('404') ||
+          error?.message?.includes('not found') ||
+          error?.message?.includes('no matches')
+        ) {
           console.log('[ViolationsList] Gatekeeper CRDs not found');
           setGatekeeperNotInstalled(true);
         }
@@ -111,10 +95,12 @@ function ViolationsList({}: ViolationsListProps) {
 
     constraintObjects.forEach((constraintObj: any) => {
       // Handle both KubeObject instances and raw constraint objects
-      const constraint = constraintObj.jsonData ? (constraintObj.jsonData as Constraint) : (constraintObj as Constraint);
+      const constraint = constraintObj.jsonData
+        ? (constraintObj.jsonData as Constraint)
+        : (constraintObj as Constraint);
 
       if (constraint.status?.violations) {
-        constraint.status.violations.forEach((violation) => {
+        constraint.status.violations.forEach(violation => {
           allViolations.push({
             ...violation,
             constraintName: constraint.metadata.name,
@@ -151,14 +137,26 @@ function ViolationsList({}: ViolationsListProps) {
   const filteredViolations = useMemo(() => {
     return violations.filter(v => {
       const resourceKindMatch = resourceKindFilter === 'All' || v.kind === resourceKindFilter;
-      const constraintKindMatch = constraintKindFilter === 'All' || v.constraintKind === constraintKindFilter;
-      const enforcementActionMatch = enforcementActionFilter === 'All' || v.enforcementAction === enforcementActionFilter;
+      const constraintKindMatch =
+        constraintKindFilter === 'All' || v.constraintKind === constraintKindFilter;
+      const enforcementActionMatch =
+        enforcementActionFilter === 'All' || v.enforcementAction === enforcementActionFilter;
       const fullResourceName = v.namespace ? `${v.namespace}/${v.name}` : v.name;
-      const resourceNameMatch = resourceNameFilter === '' || fullResourceName.toLowerCase().includes(resourceNameFilter.toLowerCase());
+      const resourceNameMatch =
+        resourceNameFilter === '' ||
+        fullResourceName.toLowerCase().includes(resourceNameFilter.toLowerCase());
 
-      return resourceKindMatch && constraintKindMatch && enforcementActionMatch && resourceNameMatch;
+      return (
+        resourceKindMatch && constraintKindMatch && enforcementActionMatch && resourceNameMatch
+      );
     });
-  }, [violations, resourceKindFilter, constraintKindFilter, enforcementActionFilter, resourceNameFilter]);
+  }, [
+    violations,
+    resourceKindFilter,
+    constraintKindFilter,
+    enforcementActionFilter,
+    resourceNameFilter,
+  ]);
 
   function makeEnforcementActionChip(violation: ViolationWithConstraint) {
     const action = violation.enforcementAction;
@@ -172,9 +170,7 @@ function ViolationsList({}: ViolationsListProps) {
   }
 
   function getResourceName(violation: ViolationWithConstraint) {
-    return violation.namespace
-      ? `${violation.namespace}/${violation.name}`
-      : violation.name;
+    return violation.namespace ? `${violation.namespace}/${violation.name}` : violation.name;
   }
 
   // Show install prompt if Gatekeeper is not installed
@@ -191,18 +187,14 @@ function ViolationsList({}: ViolationsListProps) {
     };
 
     return (
-      <SectionBox title="Violations">
+      <SectionBox title={props.hideTitle ? undefined : 'Violations'}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and track violations.
+            Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start
+            using policy enforcement and track violations.
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleInstallGatekeeper}
-          >
+          <Button variant="contained" color="primary" onClick={handleInstallGatekeeper}>
             Install Gatekeeper
           </Button>
         </Alert>
@@ -211,119 +203,141 @@ function ViolationsList({}: ViolationsListProps) {
   }
 
   return (
-    <SectionBox title="Violations">
+    <SectionBox title={props.hideTitle ? undefined : 'Violations'}>
       {!constraintObjects ? (
         <Loader title="Loading violations..." />
       ) : (
-          <>
-            <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-              <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="resource-kind-filter-label">Resource Kind</InputLabel>
-                <Select
-                  labelId="resource-kind-filter-label"
-                  value={resourceKindFilter}
-                  label="Resource Kind"
-                  onChange={(e) => setResourceKindFilter(e.target.value as string)}
-                >
-                  {uniqueResourceKinds.map(kind => (
-                    <MenuItem key={kind} value={kind}>{kind}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="constraint-kind-filter-label">Constraint Kind</InputLabel>
-                <Select
-                  labelId="constraint-kind-filter-label"
-                  value={constraintKindFilter}
-                  label="Constraint Kind"
-                  onChange={(e) => setConstraintKindFilter(e.target.value as string)}
-                >
-                  {uniqueConstraintKinds.map(kind => (
-                    <MenuItem key={kind} value={kind}>{kind}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel id="enforcement-action-filter-label">Enforcement Action</InputLabel>
-                <Select
-                  labelId="enforcement-action-filter-label"
-                  value={enforcementActionFilter}
-                  label="Enforcement Action"
-                  onChange={(e) => setEnforcementActionFilter(e.target.value as string)}
-                >
-                  {uniqueEnforcementActions.map(action => (
-                    <MenuItem key={action} value={action}>{action}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Resource Name (ns/name or name)"
-                variant="outlined"
-                size="small"
-                value={resourceNameFilter}
-                onChange={(e) => setResourceNameFilter(e.target.value)}
-                sx={{ minWidth: 250 }}
+        <>
+          <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <FormControl sx={{ minWidth: 180 }} size="small">
+              <InputLabel id="violations-resource-kind-filter-label">Resource Kind</InputLabel>
+              <Select
+                id="violations-resource-kind-filter"
+                labelId="violations-resource-kind-filter-label"
+                value={resourceKindFilter}
+                label="Resource Kind"
+                onChange={e => setResourceKindFilter(e.target.value as string)}
+              >
+                {uniqueResourceKinds.map(kind => (
+                  <MenuItem key={kind} value={kind}>
+                    {kind}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl sx={{ minWidth: 180 }} size="small">
+              <InputLabel id="violations-constraint-kind-filter-label">Constraint Kind</InputLabel>
+              <Select
+                id="violations-constraint-kind-filter"
+                labelId="violations-constraint-kind-filter-label"
+                value={constraintKindFilter}
+                label="Constraint Kind"
+                onChange={e => setConstraintKindFilter(e.target.value as string)}
+              >
+                {uniqueConstraintKinds.map(kind => (
+                  <MenuItem key={kind} value={kind}>
+                    {kind}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl sx={{ minWidth: 180 }} size="small">
+              <InputLabel id="violations-enforcement-action-filter-label">
+                Enforcement Action
+              </InputLabel>
+              <Select
+                id="violations-enforcement-action-filter"
+                labelId="violations-enforcement-action-filter-label"
+                value={enforcementActionFilter}
+                label="Enforcement Action"
+                onChange={e => setEnforcementActionFilter(e.target.value as string)}
+              >
+                {uniqueEnforcementActions.map(action => (
+                  <MenuItem key={action} value={action}>
+                    {action}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Resource Name (ns/name or name)"
+              variant="outlined"
+              size="small"
+              value={resourceNameFilter}
+              onChange={e => setResourceNameFilter(e.target.value)}
+              sx={{ minWidth: 250 }}
+            />
+          </Box>
+          {violations.length === 0 && constraintObjects.length > 0 && (
+            <Typography sx={{ padding: 2 }}>
+              No violations found across {constraintObjects.length} constraints.
+            </Typography>
+          )}
+          {/* Update empty messages based on filters */}
+          {violations.length > 0 && filteredViolations.length === 0 && (
+            <Typography sx={{ padding: 2 }}>No violations match the current filters.</Typography>
+          )}
+          {constraintObjects.length === 0 && violations.length === 0 && (
+            <Typography sx={{ padding: 2 }}>No violations found.</Typography>
+          )}
+          {filteredViolations.length > 0 && (
+            <TableContainer component={Paper}>
+              <SimpleTable
+                data={filteredViolations}
+                columns={[
+                  {
+                    label: 'Resource',
+                    getter: (violation: ViolationWithConstraint) => getResourceName(violation),
+                  },
+                  {
+                    label: 'Kind',
+                    getter: (violation: any) => violation.kind,
+                  },
+                  {
+                    label: 'Constraint',
+                    getter: (violation: any) => (
+                      <Link
+                        routeName={RouteName.Constraint}
+                        params={{
+                          kind: violation.constraintKind,
+                          name: violation.constraintName,
+                        }}
+                      >
+                        {violation.constraintName}
+                      </Link>
+                    ),
+                  },
+                  {
+                    label: 'Constraint Kind',
+                    getter: (violation: any) => violation.constraintKind,
+                  },
+                  {
+                    label: 'Enforcement',
+                    getter: (violation: any) => makeEnforcementActionChip(violation),
+                  },
+                  {
+                    label: 'Message',
+                    getter: (violation: any) => violation.message,
+                  },
+                  {
+                    label: 'Actions',
+                    getter: (violation: ViolationWithConstraint) => (
+                      <Link
+                        routeName={RouteName.Violation}
+                        params={{
+                          kind: violation.constraintKind,
+                          name: violation.constraintName,
+                        }}
+                      >
+                        View Violations
+                      </Link>
+                    ),
+                  },
+                ]}
               />
-            </Box>
-            {violations.length === 0 && constraintObjects.length > 0 && (
-              <Typography sx={{ padding: 2 }}>No violations found across {constraintObjects.length} constraints.</Typography>
-            )}
-            {/* Update empty messages based on filters */}
-            {violations.length > 0 && filteredViolations.length === 0 && (
-                <Typography sx={{ padding: 2 }}>No violations match the current filters.</Typography>
-            )}
-            {constraintObjects.length === 0 && violations.length === 0 && (
-              <Typography sx={{ padding: 2 }}>No violations found.</Typography>
-            )}
-            {filteredViolations.length > 0 && (
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Resource</TableCell>
-                      <TableCell>Kind</TableCell>
-                      <TableCell>Constraint</TableCell>
-                      <TableCell>Constraint Kind</TableCell>
-                      <TableCell>Enforcement</TableCell>
-                      <TableCell>Message</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredViolations.map((violation, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Link
-                            routeName="gatekeeper/violations/:kind/:name"
-                            params={{
-                              kind: violation.constraintKind,
-                              name: violation.constraintName,
-                            }}
-                          >
-                            {getResourceName(violation)}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{violation.kind}</TableCell>
-                        <TableCell>
-                          <Link
-                            routeName="gatekeeper/constraints/:kind/:name"
-                            params={{
-                              kind: violation.constraintKind,
-                              name: violation.constraintName,
-                            }}
-                          >
-                            {violation.constraintName}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{violation.constraintKind}</TableCell>
-                        <TableCell>{makeEnforcementActionChip(violation)}</TableCell>
-                        <TableCell>{violation.message}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </>
+            </TableContainer>
+          )}
+        </>
       )}
     </SectionBox>
   );
