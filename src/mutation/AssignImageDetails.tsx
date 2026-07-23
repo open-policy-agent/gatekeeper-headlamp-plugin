@@ -149,9 +149,13 @@ export default function AssignImageDetails() {
               </Alert>
             )}
           </Box>
-        ) : (
+        ) : (data.status?.byPod?.length > 0 && data.status.byPod.every((p: any) => p.enforced === true)) ? (
           <Alert severity="success">
-            Active and successfully synced.
+            Active and successfully synced (enforced).
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            Pending or not enforced.
           </Alert>
         )}
       </SectionBox>

@@ -141,9 +141,13 @@ export default function ConnectionDetails() {
               </Alert>
             )}
           </Box>
-        ) : (
+        ) : (data.status?.byPod?.length > 0 && data.status.byPod.every((p: any) => p.active === true)) ? (
           <Alert severity="success">
             Active and successfully synced.
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            Inactive or pending.
           </Alert>
         )}
       </SectionBox>

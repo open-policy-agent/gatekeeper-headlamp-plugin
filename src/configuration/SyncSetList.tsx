@@ -21,8 +21,8 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
     if (!items) return ['All'];
     const kinds = new Set<string>();
     items.forEach(item => {
-      const syncOnly = item.spec?.syncOnly || [];
-      syncOnly.forEach((s: any) => {
+      const gvks = item.jsonData?.spec?.gvks || [];
+      gvks.forEach((s: any) => {
          if (s.kind) kinds.add(s.kind);
       });
     });
@@ -33,8 +33,8 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
     if (!items) return [];
     if (kindFilter === 'All') return items;
     return items.filter(item => {
-      const syncOnly = item.spec?.syncOnly || [];
-      return syncOnly.some((s: any) => s.kind === kindFilter);
+      const gvks = item.jsonData?.spec?.gvks || [];
+      return gvks.some((s: any) => s.kind === kindFilter);
     });
   }, [items, kindFilter]);
 

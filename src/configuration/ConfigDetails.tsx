@@ -160,9 +160,13 @@ export default function ConfigDetails() {
               </Alert>
             )}
           </Box>
-        ) : (
+        ) : (data.status?.byPod?.length > 0) ? (
           <Alert severity="success">
             Active and successfully synced.
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            Pending or unknown status.
           </Alert>
         )}
       </SectionBox>

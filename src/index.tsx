@@ -28,7 +28,7 @@ import ExternalDataPage from './externaldata/ExternalDataPage';
 export namespace RoutingPath {
   // Library
   export const Library = '/gatekeeper/library';
-  export const LibraryTemplate = '/gatekeeper/library/:category/:name';
+  export const LibraryTemplate = '/gatekeeper/library/:id';
 
   // Policies / Constraints
   export const ConstraintTemplate = '/gatekeeper/constraint-templates/:name';

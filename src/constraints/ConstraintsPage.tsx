@@ -5,12 +5,21 @@ import ConstraintTemplateList from '../constraint-template/List';
 import ConstraintList from '../constraint/List';
 import ViolationsList from '../violations/List';
 
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 function TabPanel(props: any) {
   const { children, value, index, ...other } = props;
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -33,9 +42,9 @@ export default function ConstraintsPage() {
     <SectionBox title="Constraints">
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="policies tabs">
-          <Tab label="Constraint Templates" />
-          <Tab label="Constraints" />
-          <Tab label="Violations" />
+          <Tab label="Constraint Templates" {...a11yProps(0)} />
+          <Tab label="Constraints" {...a11yProps(1)} />
+          <Tab label="Violations" {...a11yProps(2)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>

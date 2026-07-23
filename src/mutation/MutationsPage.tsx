@@ -6,12 +6,21 @@ import AssignMetadataList from './AssignMetadataList';
 import AssignImageList from './AssignImageList';
 import ModifySetList from './ModifySetList';
 
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 function TabPanel(props: any) {
   const { children, value, index, ...other } = props;
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -34,10 +43,10 @@ export default function MutationsPage() {
     <SectionBox title="Mutations">
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="mutations tabs">
-          <Tab label="Assign" />
-          <Tab label="AssignMetadata" />
-          <Tab label="AssignImage" />
-          <Tab label="ModifySet" />
+          <Tab label="Assign" {...a11yProps(0)} />
+          <Tab label="AssignMetadata" {...a11yProps(1)} />
+          <Tab label="AssignImage" {...a11yProps(2)} />
+          <Tab label="ModifySet" {...a11yProps(3)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>

@@ -21,8 +21,8 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
     if (!items) return ['All'];
     const drivers = new Set<string>();
     items.forEach(item => {
-      if (item.spec?.driver) {
-        drivers.add(item.spec.driver);
+      if (item.jsonData?.spec?.driver) {
+        drivers.add(item.jsonData?.spec?.driver);
       }
     });
     return ['All', ...Array.from(drivers).sort()];
@@ -31,7 +31,7 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
   const filteredItems = useMemo(() => {
     if (!items) return [];
     if (driverFilter === 'All') return items;
-    return items.filter(item => item.spec?.driver === driverFilter);
+    return items.filter(item => item.jsonData?.spec?.driver === driverFilter);
   }, [items, driverFilter]);
 
   if (error) {
@@ -82,6 +82,10 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
           {
             label: 'Namespace',
             getter: (item) => item.metadata.namespace || '-',
+          },
+          {
+            label: 'Driver',
+            getter: (item) => item.jsonData?.spec?.driver || '-',
           },
           {
             label: 'Age',

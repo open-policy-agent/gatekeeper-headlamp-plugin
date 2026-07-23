@@ -85,17 +85,12 @@ const fetchLibraryTemplates = async (token: string = ''): Promise<LibraryTemplat
       const categoryName = categoryDir.name;
       console.log(`[LibraryList] Processing category: ${categoryName}`);
       let templateDirs: any[];
-      try {
-        // 2. Fetch template directories within this category
+      // 2. Fetch template directories
         templateDirs = await fetchGitHubAPI(categoryDir.path, token);
         if (!Array.isArray(templateDirs)) {
           console.error(`[LibraryList] Expected an array for templates in category ${categoryName}, got:`, templateDirs);
           return; // Skip this category
         }
-      } catch (error) {
-        console.error(`[LibraryList] Failed to fetch templates in category ${categoryName}:`, error);
-        return; // Skip this category on error
-      }
 
       const templateDetailPromises = templateDirs
         .filter(item => item.type === 'dir') // These are the actual template directories
@@ -145,7 +140,7 @@ const fetchLibraryTemplates = async (token: string = ''): Promise<LibraryTemplat
     });
 
   // Process all categories
-  await Promise.allSettled(categoryProcessingPromises);
+  await Promise.all(categoryProcessingPromises);
 
   console.log(`[LibraryList] Finished fetching templates. Total found: ${collectedTemplates.length}`);
   // Sort templates by name for consistent display
@@ -158,11 +153,11 @@ function LibraryList() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>(''); // '' for All Categories
-  const [githubToken, setGithubToken] = useState<string>(() => localStorage.getItem('gatekeeper_github_token') || '');
+  const [githubToken, setGithubToken] = useState<string>('');
   const [isOffline, setIsOffline] = useState<boolean>(false);
 
   const handleSaveToken = () => {
-    localStorage.setItem('gatekeeper_github_token', githubToken);
+    
     loadData();
   };
 

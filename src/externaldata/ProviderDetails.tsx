@@ -58,8 +58,10 @@ export default function ProviderDetails() {
       {
         name: 'CA Bundle',
         value: data.spec?.caBundle ? (
-           <Box component="pre" sx={{ maxWidth: '600px', overflowX: 'auto', bgcolor: '#f5f5f5', p: 1, borderRadius: 1 }}>
-             {data.spec.caBundle}
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+             <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'background.default', p: 0.5, borderRadius: 1 }}>
+               {data.spec.caBundle.substring(0, 15)}... (Masked)
+             </Typography>
            </Box>
         ) : '-',
       }
@@ -125,9 +127,13 @@ export default function ProviderDetails() {
               </Alert>
             )}
           </Box>
-        ) : (
+        ) : (data.status?.byPod?.length > 0 && data.status.byPod.every((p: any) => p.active === true)) ? (
           <Alert severity="success">
             Active and successfully synced.
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            Inactive or pending.
           </Alert>
         )}
       </SectionBox>

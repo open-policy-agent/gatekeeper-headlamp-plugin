@@ -279,7 +279,17 @@ function ViolationsList(props: ViolationsListProps) {
                   columns={[
                     {
                       label: 'Resource',
-                      getter: (violation: any) => getResourceName(violation),
+                      getter: (violation: any) => (
+                        <Link
+                          routeName={RoutingPath.Violation}
+                          params={{
+                            kind: violation.constraintKind,
+                            name: violation.constraintName,
+                          }}
+                        >
+                          {getResourceName(violation)}
+                        </Link>
+                      ),
                     },
                     {
                       label: 'Kind',

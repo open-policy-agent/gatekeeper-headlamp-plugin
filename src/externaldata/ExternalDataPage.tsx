@@ -4,12 +4,21 @@ import React, { useState } from 'react';
 import ProviderList from './ProviderList';
 import ConnectionList from './ConnectionList';
 
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 function TabPanel(props: any) {
   const { children, value, index, ...other } = props;
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -32,8 +41,8 @@ export default function ExternalDataPage() {
     <SectionBox title="External Data">
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="external data tabs">
-          <Tab label="Provider" />
-          <Tab label="Connection" />
+          <Tab label="Provider" {...a11yProps(0)} />
+          <Tab label="Connection" {...a11yProps(1)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>

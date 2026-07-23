@@ -115,31 +115,7 @@ export default function SyncSetDetails() {
         </SectionBox>
       )}
     
-      <SectionBox title="System Sync Status">
-        {(data.status?.errors && data.status.errors.length > 0) || (data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0)) ? (
-          <Box>
-            {data.status?.errors && data.status.errors.length > 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                <strong>Global Error:</strong> {JSON.stringify(data.status.errors)}
-              </Alert>
-            )}
-            {data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0) && (
-              <Alert severity="error">
-                <strong>Sync Error:</strong> Failed to load this rule in Gatekeeper.
-                <ul style={{ margin: 0, paddingLeft: '20px', marginTop: '8px' }}>
-                  {data.status.byPod.filter((p: any) => p.errors && p.errors.length > 0).map((p: any) => (
-                    <li key={p.id}>{p.id}: {JSON.stringify(p.errors)}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-          </Box>
-        ) : (
-          <Alert severity="success">
-            Active and successfully synced.
-          </Alert>
-        )}
-      </SectionBox>
+      
     </Box>
   );
 }

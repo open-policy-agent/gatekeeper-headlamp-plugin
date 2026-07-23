@@ -4,12 +4,21 @@ import React, { useState } from 'react';
 import ConfigList from './ConfigList';
 import SyncSetList from './SyncSetList';
 
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 function TabPanel(props: any) {
   const { children, value, index, ...other } = props;
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -32,8 +41,8 @@ export default function ConfigurationPage() {
     <SectionBox title="Configurations">
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="configuration tabs">
-          <Tab label="Config" />
-          <Tab label="SyncSet" />
+          <Tab label="Config" {...a11yProps(0)} />
+          <Tab label="SyncSet" {...a11yProps(1)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>

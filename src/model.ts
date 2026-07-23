@@ -327,8 +327,8 @@ export const SyncSetClass = makeCustomResourceClass({
 
 // --- External Data Models ---
 const apiGatekeeperExternalDataGroupVersion = [
-  { group: 'externaldata.gatekeeper.sh', version: 'v1alpha1' },
   { group: 'externaldata.gatekeeper.sh', version: 'v1beta1' },
+  { group: 'externaldata.gatekeeper.sh', version: 'v1alpha1' },
 ];
 
 export const ProviderClass = makeCustomResourceClass({
