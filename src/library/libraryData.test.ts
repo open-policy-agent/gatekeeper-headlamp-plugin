@@ -171,6 +171,42 @@ describe('Policy Library data loading', () => {
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 
+  it('uses raw GitHub content for template YAML without spending REST quota or forwarding the token', async () => {
+    setGitHubToken('secret-token');
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      void init;
+      if (url.includes('/contents/library?')) {
+        return jsonResponse([{ type: 'dir', name: 'general', path: 'library/general' }]);
+      }
+      if (url.includes('/contents/library/general?')) {
+        return jsonResponse([
+          { type: 'dir', name: 'raw-template', path: 'library/general/raw-template' },
+        ]);
+      }
+      if (url.includes('/general/raw-template/template.yaml')) {
+        return new Response(validTemplateYAML, { status: 200 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchLibraryTemplates();
+
+    expect(result.templates).toHaveLength(1);
+    const rawRequest = fetchMock.mock.calls.find(([input]) =>
+      String(input).includes('/general/raw-template/template.yaml')
+    );
+    expect(String(rawRequest?.[0])).toMatch(
+      /^https:\/\/raw\.githubusercontent\.com\/open-policy-agent\/gatekeeper-library\/master\//
+    );
+    expect(rawRequest?.[1]).toEqual(
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ Authorization: expect.any(String) }),
+      })
+    );
+  });
+
   it('rejects oversized template YAML before reading the response body and reports a partial failure', async () => {
     const readOversizedBody = vi.fn();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -341,7 +377,7 @@ describe('Policy Library data loading', () => {
       if (url.includes('/contents/library?')) {
         return jsonResponse(categories);
       }
-      if (url.includes('/template-') && url.includes('/template.yaml?')) {
+      if (url.includes('/template-') && url.includes('/template.yaml')) {
         return new Response(validTemplateYAML, { status: 200 });
       }
       if (url.includes('/contents/library/category-')) {

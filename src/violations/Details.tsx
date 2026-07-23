@@ -1,43 +1,43 @@
-import {
-  Link,
-  Loader,
-  SectionBox,
-  SimpleTable,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import {
-  Box,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography} from '@mui/material';
+import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { ResourceDetailsError, ResourceDetailsLoading } from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
 import { ConstraintClass } from '../model';
 
 interface ViolationsDetailsProps {}
 
 function ViolationsDetails({}: ViolationsDetailsProps) {
-  const { name } = useParams<{ kind: string; name: string }>();
+  const { kind, name } = useParams<{ kind: string; name: string }>();
   const [constraint, setConstraint] = useState<any>(null);
+  const { error, loading } = ConstraintClass.useApiGet(setConstraint, name, kind);
 
-  ConstraintClass.useApiGet(setConstraint, name);
+  if (error) {
+    return (
+      <ResourceDetailsError
+        error={error}
+        kind={kind ? `${kind} Constraint` : 'Constraint'}
+        name={name}
+      />
+    );
+  }
 
-  if (!constraint) {
-    return <Loader title="Loading violation details" />;
+  if (loading || !constraint) {
+    return <ResourceDetailsLoading kind="Violation" />;
   }
 
   function getConstraintInfoRows() {
     if (!constraint) return [];
 
     const action = constraint.spec?.enforcementAction || 'warn';
-    const actionColor = ({
-      deny: 'error',
-      dryrun: 'warning',
-      warn: 'info',
-    } as any)[action] as 'error' | 'warning' | 'info';
+    const actionColor = (
+      {
+        deny: 'error',
+        dryrun: 'warning',
+        warn: 'info',
+      } as any
+    )[action] as 'error' | 'warning' | 'info';
 
     return [
       {
@@ -133,7 +133,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
       <SectionBox title="Constraint Details">
         <Table>
           <TableBody>
-            {getConstraintInfoRows().map((row) => (
+            {getConstraintInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}

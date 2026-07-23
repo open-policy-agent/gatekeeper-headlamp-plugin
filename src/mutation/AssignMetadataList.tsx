@@ -28,7 +28,12 @@ export default function AssignMetadataList(props: { hideTitle?: boolean }) {
   const [error, setError] = useState<Error | null>(null);
   const [kindFilter, setKindFilter] = useState<string>('All');
 
-  AssignMetadataClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  AssignMetadataClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const uniqueKinds = useMemo(() => {
     if (!items) return ['All'];

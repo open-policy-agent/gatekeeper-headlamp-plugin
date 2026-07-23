@@ -14,7 +14,12 @@ export default function ProviderList(props: { hideTitle?: boolean }) {
   const [items, setItems] = useState<KubeObject[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  ProviderClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  ProviderClass.useApiList(handleItems, (err: Error) => setError(err));
 
   if (error) {
     return (

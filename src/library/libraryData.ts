@@ -255,21 +255,11 @@ async function fetchGitHubContents(
   return body as GitHubContentEntry[];
 }
 
-async function fetchFileContent(
-  category: string,
-  templateName: string,
-  token = getGitHubToken()
-): Promise<string> {
-  const path = `${LIBRARY_BASE_PATH}/${category}/${templateName}/template.yaml`;
+async function fetchFileContent(category: string, templateName: string): Promise<string> {
   const sourceUrl = buildTemplateSourceUrl(category, templateName);
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github.raw+json',
-  };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(buildGitHubContentsUrl(path), { headers });
+  const response = await fetch(sourceUrl, {
+    headers: { Accept: 'text/plain, application/yaml;q=0.9, */*;q=0.1' },
+  });
   if (!response.ok) {
     throw new GitHubRequestError(
       sourceUrl,
@@ -360,11 +350,10 @@ function readTemplateMetadata(
 
 export async function fetchLibraryTemplate(
   category: string,
-  templateName: string,
-  token = getGitHubToken()
+  templateName: string
 ): Promise<LibraryTemplate> {
   const sourceUrl = buildTemplateSourceUrl(category, templateName);
-  const rawYAML = await fetchFileContent(category, templateName, token);
+  const rawYAML = await fetchFileContent(category, templateName);
   const metadata = readTemplateMetadata(rawYAML, templateName);
 
   return {
@@ -467,7 +456,7 @@ export async function fetchLibraryTemplates(token = getGitHubToken()): Promise<L
     LIBRARY_LIMITS.requestConcurrency,
     async ({ category, templateName }) => {
       try {
-        templates.push(await fetchLibraryTemplate(category, templateName, token));
+        templates.push(await fetchLibraryTemplate(category, templateName));
       } catch (error) {
         failures.push({
           scope: 'template',

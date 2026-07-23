@@ -66,6 +66,10 @@ interface PreparedTemplate {
 
 const CRD_ESTABLISHED_TIMEOUT_MS = 30000;
 const CRD_POLL_INTERVAL_MS = 2000;
+const SUPPORTED_CONSTRAINT_TEMPLATE_API_VERSIONS = new Set([
+  'templates.gatekeeper.sh/v1',
+  'templates.gatekeeper.sh/v1beta1',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -168,6 +172,50 @@ function prepareTemplate(template: LibraryTemplate): PreparedTemplate {
     constraintName: `my-${parsedTemplate.metadata.name?.toLowerCase() || template.id}-constraint`,
     constraintParams: JSON.stringify(exampleParams, null, 2),
   };
+}
+
+function buildConstraintTemplateApiUrl(apiVersion: string, name?: string): string {
+  if (!SUPPORTED_CONSTRAINT_TEMPLATE_API_VERSIONS.has(apiVersion)) {
+    throw new Error(
+      `Unsupported ConstraintTemplate apiVersion "${apiVersion}". Supported versions are templates.gatekeeper.sh/v1 and templates.gatekeeper.sh/v1beta1.`
+    );
+  }
+
+  const collectionUrl = `/apis/${apiVersion}/constrainttemplates`;
+  return name ? `${collectionUrl}/${encodeURIComponent(name)}` : collectionUrl;
+}
+
+function normalizeSemanticValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeSemanticValue);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .filter(key => value[key] !== undefined)
+      .map(key => [key, normalizeSemanticValue(value[key])])
+  );
+}
+
+function constraintTemplateSpecsAreEquivalent(
+  desiredTemplate: KubeObjectInterface,
+  existingTemplate: unknown
+): boolean {
+  const desiredSpec = (desiredTemplate as KubeObjectInterface & { spec?: unknown }).spec;
+  const existingSpec = isRecord(existingTemplate) ? existingTemplate.spec : undefined;
+
+  if (desiredSpec === undefined || existingSpec === undefined) {
+    return false;
+  }
+
+  return (
+    JSON.stringify(normalizeSemanticValue(desiredSpec)) ===
+    JSON.stringify(normalizeSemanticValue(existingSpec))
+  );
 }
 
 function getApiErrorStatus(error: unknown): number | undefined {
@@ -412,13 +460,15 @@ function LibraryTemplateDetails() {
         throw new Error(`Invalid ConstraintTemplate YAML: ${getErrorMessage(error)}`);
       }
 
-      if (!templateObjectToApply.kind || !templateObjectToApply.apiVersion) {
+      const templateName = templateObjectToApply.metadata?.name;
+      if (!templateObjectToApply.kind || !templateObjectToApply.apiVersion || !templateName) {
         throw new Error('Parsed template YAML is not a valid Kubernetes object.');
       }
 
+      const templateCollectionUrl = buildConstraintTemplateApiUrl(templateObjectToApply.apiVersion);
       let templateApplyOutcome: 'was applied' | 'already existed' = 'was applied';
       try {
-        await ApiProxy.request('/apis/templates.gatekeeper.sh/v1/constrainttemplates', {
+        await ApiProxy.request(templateCollectionUrl, {
           method: 'POST',
           body: JSON.stringify(templateObjectToApply),
           headers: { 'Content-Type': 'application/json' },
@@ -430,10 +480,20 @@ function LibraryTemplateDetails() {
         });
       } catch (error) {
         if (getApiErrorStatus(error) === 409) {
+          const existingTemplate = await ApiProxy.request(
+            buildConstraintTemplateApiUrl(templateObjectToApply.apiVersion, templateName),
+            { method: 'GET' }
+          );
+          if (!constraintTemplateSpecsAreEquivalent(templateObjectToApply, existingTemplate)) {
+            throw new Error(
+              `ConstraintTemplate ${templateName} already exists, but its spec is not semantically equivalent to the Policy Library template. Review or remove the existing template before applying. The Constraint was not created.`
+            );
+          }
+
           templateApplyOutcome = 'already existed';
           setSnackbarState({
             open: true,
-            message: `ConstraintTemplate ${templateObjectToApply.metadata.name} already exists. Checking CRD...`,
+            message: `ConstraintTemplate ${templateName} already exists with an equivalent spec. Checking CRD...`,
             severity: 'warning',
           });
         } else {
@@ -441,7 +501,6 @@ function LibraryTemplateDetails() {
         }
       }
 
-      const templateName = templateObjectToApply.metadata.name || 'selected template';
       const partialApplyPrefix = `ConstraintTemplate ${templateName} ${templateApplyOutcome}`;
       const crdName = `${pluralPath}.constraints.gatekeeper.sh`;
       let crdEstablished = false;
@@ -575,7 +634,10 @@ function LibraryTemplateDetails() {
           <TextField
             label="Constraint Name"
             value={constraintName}
-            onChange={event => setConstraintName(event.target.value)}
+            onChange={event => {
+              setConstraintName(event.target.value);
+              setGeneratedConstraintYAML(null);
+            }}
             fullWidth
             margin="normal"
             required
@@ -589,7 +651,10 @@ function LibraryTemplateDetails() {
           <TextField
             label="Match Criteria (JSON format)"
             value={matchCriteria}
-            onChange={event => setMatchCriteria(event.target.value)}
+            onChange={event => {
+              setMatchCriteria(event.target.value);
+              setGeneratedConstraintYAML(null);
+            }}
             multiline
             rows={5}
             fullWidth
@@ -606,7 +671,10 @@ function LibraryTemplateDetails() {
               <TextField
                 label="Parameters (JSON format)"
                 value={constraintParams}
-                onChange={event => setConstraintParams(event.target.value)}
+                onChange={event => {
+                  setConstraintParams(event.target.value);
+                  setGeneratedConstraintYAML(null);
+                }}
                 multiline
                 rows={5}
                 fullWidth

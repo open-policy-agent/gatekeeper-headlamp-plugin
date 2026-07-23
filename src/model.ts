@@ -34,12 +34,92 @@ const apiGatekeeperTemplatesGroupVersion = constraintTemplateApiVersions.map(ver
   version,
 }));
 
+export interface ConstraintTypeDefinition {
+  kind: string;
+  plural: string;
+}
+
+export interface ConstraintApiError extends Error {
+  status?: number;
+  json?: {
+    code?: number;
+    message?: string;
+    reason?: string;
+  };
+  response?: {
+    status?: number;
+    data?: {
+      code?: number;
+      message?: string;
+      reason?: string;
+    };
+  };
+}
+
+interface ConstraintGetState {
+  constraintPlural: string | null;
+  error: ConstraintApiError | null;
+  loading: boolean;
+}
+
 export const ConstraintTemplateClass = makeCustomResourceClass({
   apiInfo: apiGatekeeperTemplatesGroupVersion,
   isNamespaced: false,
   singularName: 'constrainttemplate',
   pluralName: 'constrainttemplates',
 });
+
+function getApiErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const apiError = error as ConstraintApiError;
+  return apiError.status ?? apiError.response?.status ?? apiError.json?.code;
+}
+
+export function isNotFoundError(error: unknown): boolean {
+  if (getApiErrorStatus(error) === 404) {
+    return true;
+  }
+
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const apiError = error as ConstraintApiError;
+  return apiError.json?.reason === 'NotFound' || apiError.response?.data?.reason === 'NotFound';
+}
+
+function normalizeConstraintApiError(error: unknown): ConstraintApiError {
+  const apiError = error as Partial<ConstraintApiError> | null | undefined;
+  const message = apiError?.json?.message || apiError?.response?.data?.message;
+  const normalizedError =
+    error instanceof Error
+      ? (error as ConstraintApiError)
+      : Object.assign(new Error(message || 'The Kubernetes API request failed.'), apiError);
+  const status = getApiErrorStatus(error);
+
+  if (status !== undefined && normalizedError.status === undefined) {
+    normalizedError.status = status;
+  }
+  if (!normalizedError.json && apiError?.response?.data) {
+    normalizedError.json = apiError.response.data;
+  }
+
+  return normalizedError;
+}
+
+function makeConstraintNotFoundError(message: string): ConstraintApiError {
+  return Object.assign(new Error(message), {
+    status: 404,
+    json: {
+      code: 404,
+      message,
+      reason: 'NotFound',
+    },
+  });
+}
 
 export async function requestConstraintTemplates(name?: string): Promise<any> {
   if (typeof effectiveRequestFunc !== 'function') {
@@ -53,8 +133,8 @@ export async function requestConstraintTemplates(name?: string): Promise<any> {
       return await effectiveRequestFunc(
         `/apis/templates.gatekeeper.sh/${version}/constrainttemplates${suffix}`
       );
-    } catch (error: any) {
-      if (error?.status === 404) {
+    } catch (error: unknown) {
+      if (isNotFoundError(error)) {
         lastNotFoundError = error;
         continue;
       }
@@ -65,80 +145,83 @@ export async function requestConstraintTemplates(name?: string): Promise<any> {
   throw lastNotFoundError ?? new Error('No supported ConstraintTemplate API version is available.');
 }
 
-// Utility function to discover constraint types from ConstraintTemplates
-async function discoverConstraintTypes(): Promise<string[]> {
-  if (typeof effectiveRequestFunc !== 'function') {
-    console.error(
-      '[model.ts] discoverConstraintTypes: effectiveRequestFunc is NOT a function. Cannot make API call.'
-    );
+export function getConstraintTypeDefinitions(templatesResponse: any): ConstraintTypeDefinition[] {
+  if (!Array.isArray(templatesResponse?.items)) {
     return [];
   }
 
-  try {
-    const templatesResponse = await requestConstraintTemplates();
+  const definitionsByKey = new Map<string, ConstraintTypeDefinition>();
 
-    if (templatesResponse && templatesResponse.items && Array.isArray(templatesResponse.items)) {
-      const constraintTypes = templatesResponse.items
-        .map((template: any, index: number) => {
-          if (
-            !template ||
-            !template.spec ||
-            !template.spec.crd ||
-            !template.spec.crd.spec ||
-            !template.spec.crd.spec.names
-          ) {
-            console.warn(
-              `[model.ts] discoverConstraintTypes: Template item [${index}] has unexpected structure. Skipping.`
-            );
-            return null;
-          }
+  templatesResponse.items.forEach((template: any, index: number) => {
+    const names = template?.spec?.crd?.spec?.names;
+    const kind = typeof names?.kind === 'string' ? names.kind.trim() : '';
+    const plural = typeof names?.plural === 'string' ? names.plural.trim().toLowerCase() : '';
 
-          const kind = template.spec.crd.spec.names.kind;
-          const plural = template.spec.crd.spec.names.plural;
-
-          if (plural) {
-            return plural.toLowerCase();
-          } else if (kind) {
-            console.warn(
-              `[model.ts] discoverConstraintTypes: Template item [${index}] missing plural name, falling back to kind: ${kind}`
-            );
-            return kind.toLowerCase();
-          }
-          return null;
-        })
-        .filter(Boolean);
-
-      return constraintTypes as string[];
+    if (!kind || !plural) {
+      console.warn(
+        `[model.ts] getConstraintTypeDefinitions: Template item [${index}] is missing a Kubernetes kind or REST plural. Skipping.`
+      );
+      return;
     }
 
-    return [];
-  } catch (error: any) {
-    console.error(
-      '[model.ts] discoverConstraintTypes: Error during discovery process:',
-      error.message,
-      error
-    );
-    return [];
+    definitionsByKey.set(`${kind}\u0000${plural}`, { kind, plural });
+  });
+
+  return Array.from(definitionsByKey.values()).sort(
+    (left, right) => left.kind.localeCompare(right.kind) || left.plural.localeCompare(right.plural)
+  );
+}
+
+async function discoverConstraintTypes(): Promise<ConstraintTypeDefinition[]> {
+  return getConstraintTypeDefinitions(await requestConstraintTemplates());
+}
+
+export function resolveConstraintPlural(
+  definitions: ConstraintTypeDefinition[],
+  kind: string
+): string | null {
+  const matchingPlurals = Array.from(
+    new Set(definitions.filter(definition => definition.kind === kind).map(({ plural }) => plural))
+  );
+
+  if (matchingPlurals.length === 0) {
+    return null;
   }
+
+  if (matchingPlurals.length > 1) {
+    throw new Error(
+      `Constraint kind "${kind}" maps to multiple REST resources: ${matchingPlurals.join(', ')}.`
+    );
+  }
+
+  return matchingPlurals[0];
+}
+
+async function requestConstraint(constraintPlural: string, name: string): Promise<any> {
+  if (typeof effectiveRequestFunc !== 'function') {
+    throw new Error('API request function not available for finding constraint.');
+  }
+
+  return effectiveRequestFunc(
+    `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${name}`
+  );
 }
 
 // Function to fetch constraints for a specific type
 async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
   if (typeof effectiveRequestFunc !== 'function') {
-    console.error(
-      `[model.ts] fetchConstraintsOfType: effectiveRequestFunc is NOT a function for type ${constraintType}.`
-    );
-    return [];
+    throw new Error(`API request function not available for constraint type ${constraintType}.`);
   }
 
   try {
     const url = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintType}`;
     const response = await effectiveRequestFunc(url);
-    const items = response?.items || [];
-    return items;
-  } catch (error) {
-    console.error(`Error fetching constraints of type ${constraintType}:`, error);
-    return [];
+    return response?.items || [];
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -146,7 +229,7 @@ async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
 export const ConstraintClass = {
   useApiList: (setData: (data: any) => void) => {
     const [allConstraints, setAllConstraints] = React.useState<any[]>([]);
-    const [discoveredTypes, setDiscoveredTypes] = React.useState<string[]>([]);
+    const [discoveredTypes, setDiscoveredTypes] = React.useState<ConstraintTypeDefinition[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<Error | null>(null);
 
@@ -155,17 +238,8 @@ export const ConstraintClass = {
         setLoading(true);
         setError(null);
 
-        if (typeof effectiveRequestFunc !== 'function') {
-          setError(new Error('API request function not available for discovery.'));
-          setDiscoveredTypes([]);
-          setLoading(false);
-          return;
-        }
-
-        const currentDiscoveryPromise = discoverConstraintTypes();
-
         try {
-          const types = await currentDiscoveryPromise;
+          const types = await discoverConstraintTypes();
           setDiscoveredTypes(types);
         } catch (e: any) {
           setError(e);
@@ -187,26 +261,19 @@ export const ConstraintClass = {
         return;
       }
 
-      if (typeof effectiveRequestFunc !== 'function') {
-        setError(new Error('API request function not available for fetching constraints.'));
-        setAllConstraints([]);
-        setData([]);
-        return;
-      }
-
       const fetchAllConstraintData = async () => {
         const allData: any[] = [];
         let fetchErrorOccurred = false;
 
-        for (const type of discoveredTypes) {
+        for (const { plural } of discoveredTypes) {
           try {
-            const constraints = await fetchConstraintsOfType(type);
+            const constraints = await fetchConstraintsOfType(plural);
             if (constraints.length > 0) {
               allData.push(...constraints);
             }
           } catch (e: any) {
             console.error(
-              `[model.ts] useApiList: Failed to fetch constraints for type ${type}:`,
+              `[model.ts] useApiList: Failed to fetch constraints for type ${plural}:`,
               e
             );
             fetchErrorOccurred = true;
@@ -227,107 +294,99 @@ export const ConstraintClass = {
     }, [allConstraints, setData]);
   },
 
-  useApiGet: (setData: (data: any) => void, name: string, constraintType?: string) => {
-    const [constraintData, setConstraintData] = React.useState<any>(null);
-    const [discoveredTypes, setDiscoveredTypes] = React.useState<string[]>([]);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState<Error | null>(null);
+  useApiGet: (
+    setData: (data: any) => void,
+    name: string,
+    constraintKind?: string
+  ): ConstraintGetState => {
+    const [constraintPlural, setConstraintPlural] = React.useState<string | null>(null);
+    const [loading, setLoading] = React.useState(Boolean(name));
+    const [error, setError] = React.useState<ConstraintApiError | null>(null);
 
     React.useEffect(() => {
-      if (!name) {
-        setLoading(false);
-        setConstraintData(null);
-        setData(null);
-        return;
-      }
+      let cancelled = false;
 
-      const performDiscovery = async () => {
-        setLoading(true);
+      const loadConstraint = async () => {
+        setLoading(Boolean(name));
         setError(null);
+        setConstraintPlural(null);
+        setData(null);
 
-        if (typeof effectiveRequestFunc !== 'function') {
-          setError(new Error('API request function not available for discovery.'));
-          setDiscoveredTypes([]);
-          setLoading(false);
+        if (!name) {
           return;
         }
 
-        const currentDiscoveryPromise = discoverConstraintTypes();
-
         try {
-          const types = await currentDiscoveryPromise;
-          setDiscoveredTypes(types);
-        } catch (e: any) {
-          setError(e);
-          setDiscoveredTypes([]);
-        } finally {
-          setLoading(false);
-        }
-      };
+          const discoveredTypes = await discoverConstraintTypes();
+          const explicitKind = constraintKind?.trim();
 
-      performDiscovery();
-    }, [name, setData]);
-
-    React.useEffect(() => {
-      if (!name || loading) return;
-
-      if (error || discoveredTypes.length === 0) {
-        setConstraintData(null);
-        return;
-      }
-
-      if (typeof effectiveRequestFunc !== 'function') {
-        setConstraintData(null);
-        setError(new Error('API request function not available for finding constraint.'));
-        return;
-      }
-
-      const findConstraint = async () => {
-        let foundConstraint = null;
-
-        if (constraintType) {
-          try {
-            const url = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintType}/${name}`;
-            const response = await effectiveRequestFunc(url);
-            if (response) {
-              foundConstraint = response;
+          if (explicitKind) {
+            const resolvedPlural = resolveConstraintPlural(discoveredTypes, explicitKind);
+            if (!resolvedPlural) {
+              throw makeConstraintNotFoundError(
+                `Constraint kind "${explicitKind}" was not found in the discovered ConstraintTemplates.`
+              );
             }
-          } catch (e: any) {
-            console.warn(
-              `[model.ts] useApiGet: Constraint "${name}" not found in specified type "${constraintType}".`
-            );
-          }
-        }
 
-        if (!foundConstraint) {
-          for (const type of discoveredTypes) {
-            if (constraintType && type === constraintType) continue;
-            try {
-              const url = `/apis/constraints.gatekeeper.sh/v1beta1/${type}/${name}`;
-              const response = await effectiveRequestFunc(url);
-              if (response) {
-                foundConstraint = response;
-                break;
+            if (!cancelled) {
+              setConstraintPlural(resolvedPlural);
+            }
+
+            const constraint = await requestConstraint(resolvedPlural, name);
+            if (!cancelled) {
+              setData(constraint || null);
+              if (!constraint) {
+                setError(
+                  makeConstraintNotFoundError(
+                    `${explicitKind} constraint "${name}" was not returned by the Kubernetes API.`
+                  )
+                );
               }
-            } catch (e: any) {
-              // Ignore 404s when searching across types
+            }
+            return;
+          }
+
+          for (const { plural } of discoveredTypes) {
+            try {
+              const constraint = await requestConstraint(plural, name);
+              if (constraint) {
+                if (!cancelled) {
+                  setConstraintPlural(plural);
+                  setData(constraint);
+                }
+                return;
+              }
+            } catch (requestError: unknown) {
+              if (isNotFoundError(requestError)) {
+                continue;
+              }
+              throw requestError;
             }
           }
-        }
 
-        if (foundConstraint) {
-          setConstraintData(foundConstraint);
-        } else {
-          setConstraintData(null);
+          throw makeConstraintNotFoundError(
+            `Constraint "${name}" was not found in any discovered constraint type.`
+          );
+        } catch (loadError: unknown) {
+          if (!cancelled) {
+            setData(null);
+            setError(normalizeConstraintApiError(loadError));
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
         }
       };
 
-      findConstraint();
-    }, [name, constraintType, discoveredTypes, loading, error]);
+      loadConstraint();
 
-    React.useEffect(() => {
-      setData(constraintData);
-    }, [constraintData, setData, name]);
+      return () => {
+        cancelled = true;
+      };
+    }, [constraintKind, name, setData]);
+
+    return { constraintPlural, error, loading };
   },
 };
 

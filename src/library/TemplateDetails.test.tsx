@@ -4,7 +4,7 @@ import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGitHubToken, setGitHubToken } from './libraryData';
+import { clearGitHubToken } from './libraryData';
 import LibraryTemplateDetails from './TemplateDetails';
 
 const routeContext = vi.hoisted(() => ({
@@ -44,6 +44,80 @@ spec:
         plural: k8srequiredlabels
 `;
 
+const templateWithParametersYAML = `
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredlabels
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredLabels
+        plural: k8srequiredlabels
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            message:
+              type: string
+`;
+
+function useTemplateRoute(rawYAML: string = validTemplateYAML) {
+  routeContext.params = { category: 'general', name: 'k8srequiredlabels' };
+  routeContext.state = {
+    template: {
+      id: 'general-k8srequiredlabels',
+      category: 'general',
+      templateName: 'k8srequiredlabels',
+      name: 'k8srequiredlabels',
+      description: 'Requires labels',
+      sourceUrl: 'https://example.invalid/template.yaml',
+      rawYAML,
+    },
+  };
+}
+
+function establishedCRD() {
+  return {
+    status: {
+      conditions: [{ type: 'Established', status: 'True' }],
+    },
+  };
+}
+
+function compatibleExistingTemplate(apiVersion = 'templates.gatekeeper.sh/v1') {
+  return {
+    apiVersion,
+    kind: 'ConstraintTemplate',
+    metadata: {
+      name: 'k8srequiredlabels',
+      resourceVersion: '123',
+    },
+    spec: {
+      crd: {
+        spec: {
+          names: {
+            plural: 'k8srequiredlabels',
+            kind: 'K8sRequiredLabels',
+          },
+        },
+      },
+    },
+    status: { created: true },
+  };
+}
+
+async function generateConstraintPreview() {
+  expect(await screen.findByText('Library Template: k8srequiredlabels')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Preview Constraint YAML' }));
+  const applyButton = screen.getByRole('button', {
+    name: 'Apply Template & Constraint to Cluster',
+  });
+  await waitFor(() => expect((applyButton as HTMLButtonElement).disabled).toBe(false));
+  return applyButton as HTMLButtonElement;
+}
+
 beforeEach(() => {
   routeContext.params = {};
   routeContext.state = null;
@@ -60,7 +134,6 @@ afterEach(() => {
 describe('LibraryTemplateDetails route loading', () => {
   it('loads a canonical category/name route without location state', async () => {
     routeContext.params = { category: 'general', name: 'k8srequiredlabels' };
-    setGitHubToken('example-credential');
     const fetchMock = vi.fn().mockResolvedValue(new Response(validTemplateYAML, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -68,11 +141,10 @@ describe('LibraryTemplateDetails route loading', () => {
 
     expect(await screen.findByText('Library Template: k8srequiredlabels')).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.github.com/repos/open-policy-agent/gatekeeper-library/contents/library/general/k8srequiredlabels/template.yaml?ref=master',
+      'https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/general/k8srequiredlabels/template.yaml',
       {
         headers: {
-          Accept: 'application/vnd.github.raw+json',
-          Authorization: 'Bearer example-credential',
+          Accept: 'text/plain, application/yaml;q=0.9, */*;q=0.1',
         },
       }
     );
@@ -191,5 +263,154 @@ describe('LibraryTemplateDetails route loading', () => {
 
     expect(await screen.findByText(expected)).toBeTruthy();
     expect(requestMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('LibraryTemplateDetails apply safety', () => {
+  it('uses the ConstraintTemplate object v1beta1 apiVersion for the POST URL', async () => {
+    useTemplateRoute(
+      validTemplateYAML.replace('templates.gatekeeper.sh/v1', 'templates.gatekeeper.sh/v1beta1')
+    );
+    const requestMock = vi.mocked(ApiProxy.request);
+    requestMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce(establishedCRD())
+      .mockResolvedValueOnce({});
+
+    render(<LibraryTemplateDetails />);
+    const applyButton = await generateConstraintPreview();
+    fireEvent.click(applyButton);
+
+    expect(
+      await screen.findByText('ConstraintTemplate and Constraint applied successfully!')
+    ).toBeTruthy();
+    expect(requestMock).toHaveBeenNthCalledWith(
+      1,
+      '/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('rejects unsupported ConstraintTemplate apiVersions before making an API request', async () => {
+    useTemplateRoute(
+      validTemplateYAML.replace('templates.gatekeeper.sh/v1', 'templates.gatekeeper.sh/v2')
+    );
+
+    render(<LibraryTemplateDetails />);
+    const applyButton = await generateConstraintPreview();
+    fireEvent.click(applyButton);
+
+    expect(
+      await screen.findByText(
+        /Unsupported ConstraintTemplate apiVersion "templates\.gatekeeper\.sh\/v2"/i
+      )
+    ).toBeTruthy();
+    expect(ApiProxy.request).not.toHaveBeenCalled();
+  });
+
+  it('stops after a 409 when the existing ConstraintTemplate spec is incompatible', async () => {
+    useTemplateRoute();
+    const requestMock = vi.mocked(ApiProxy.request);
+    requestMock
+      .mockRejectedValueOnce(Object.assign(new Error('Already exists'), { status: 409 }))
+      .mockResolvedValueOnce({
+        ...compatibleExistingTemplate(),
+        spec: {
+          crd: {
+            spec: {
+              names: {
+                kind: 'K8sDifferentPolicy',
+                plural: 'k8srequiredlabels',
+              },
+            },
+          },
+        },
+      });
+
+    render(<LibraryTemplateDetails />);
+    const applyButton = await generateConstraintPreview();
+    fireEvent.click(applyButton);
+
+    expect(
+      await screen.findByText(
+        /already exists, but its spec is not semantically equivalent.*The Constraint was not created/i
+      )
+    ).toBeTruthy();
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestMock).toHaveBeenNthCalledWith(
+      2,
+      '/apis/templates.gatekeeper.sh/v1/constrainttemplates/k8srequiredlabels',
+      { method: 'GET' }
+    );
+    expect(requestMock).not.toHaveBeenCalledWith(
+      '/apis/constraints.gatekeeper.sh/v1beta1/k8srequiredlabels',
+      expect.anything()
+    );
+  });
+
+  it('continues after a 409 when the existing ConstraintTemplate spec is equivalent', async () => {
+    useTemplateRoute(
+      validTemplateYAML.replace('templates.gatekeeper.sh/v1', 'templates.gatekeeper.sh/v1beta1')
+    );
+    const requestMock = vi.mocked(ApiProxy.request);
+    requestMock
+      .mockRejectedValueOnce(Object.assign(new Error('Already exists'), { status: 409 }))
+      .mockResolvedValueOnce(compatibleExistingTemplate('templates.gatekeeper.sh/v1beta1'))
+      .mockResolvedValueOnce(establishedCRD())
+      .mockResolvedValueOnce({});
+
+    render(<LibraryTemplateDetails />);
+    const applyButton = await generateConstraintPreview();
+    fireEvent.click(applyButton);
+
+    expect(
+      await screen.findByText('ConstraintTemplate and Constraint applied successfully!')
+    ).toBeTruthy();
+    expect(requestMock).toHaveBeenCalledTimes(4);
+    expect(requestMock).toHaveBeenNthCalledWith(
+      1,
+      '/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(requestMock).toHaveBeenNthCalledWith(
+      2,
+      '/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates/k8srequiredlabels',
+      { method: 'GET' }
+    );
+    expect(requestMock).toHaveBeenNthCalledWith(
+      4,
+      '/apis/constraints.gatekeeper.sh/v1beta1/k8srequiredlabels',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it.each([
+    {
+      field: 'constraint name',
+      label: /Constraint Name/i,
+      value: 'updated-constraint-name',
+    },
+    {
+      field: 'match JSON',
+      label: /Match Criteria \(JSON format\)/i,
+      value: JSON.stringify({ kinds: [{ apiGroups: ['apps'], kinds: ['Deployment'] }] }),
+    },
+    {
+      field: 'parameters JSON',
+      label: /Parameters \(JSON format\)/i,
+      value: JSON.stringify({ message: 'updated' }),
+    },
+  ])('invalidates the generated preview after changing $field', async ({ label, value }) => {
+    useTemplateRoute(templateWithParametersYAML);
+    render(<LibraryTemplateDetails />);
+    const applyButton = await generateConstraintPreview();
+
+    expect(screen.getByRole('heading', { name: 'Generated Constraint YAML' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+    expect(screen.queryByRole('heading', { name: 'Generated Constraint YAML' })).toBeNull();
+    expect(applyButton.disabled).toBe(true);
+    fireEvent.click(applyButton);
+    expect(ApiProxy.request).not.toHaveBeenCalled();
   });
 });

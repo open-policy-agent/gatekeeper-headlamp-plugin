@@ -18,7 +18,12 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
   const [items, setItems] = useState<KubeObject[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  ConnectionClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  ConnectionClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const [driverFilter, setDriverFilter] = useState<string>('All');
 

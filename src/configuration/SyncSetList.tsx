@@ -18,7 +18,12 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
   const [items, setItems] = useState<KubeObject[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  SyncSetClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  SyncSetClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const [kindFilter, setKindFilter] = useState<string>('All');
 

@@ -28,7 +28,12 @@ export default function AssignImageList(props: { hideTitle?: boolean }) {
   const [error, setError] = useState<Error | null>(null);
   const [kindFilter, setKindFilter] = useState<string>('All');
 
-  AssignImageClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  AssignImageClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const uniqueKinds = useMemo(() => {
     if (!items) return ['All'];

@@ -121,7 +121,7 @@ export default function ExpansionTemplateDetails() {
       </SectionBox>
 
       {data.spec?.templateSource && (
-        <SectionBox title="Template Source (Rego)">
+        <SectionBox title="Template Source Path">
           <Paper elevation={1} sx={{ p: 2, bgcolor: '#f5f5f5', overflowX: 'auto' }}>
             <Box component="pre" sx={{ margin: 0, fontFamily: 'monospace', fontSize: '0.875rem' }}>
               {data.spec.templateSource}

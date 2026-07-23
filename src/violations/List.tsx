@@ -287,17 +287,7 @@ function ViolationsList(props: ViolationsListProps) {
                 columns={[
                   {
                     label: 'Resource',
-                    getter: (violation: ViolationWithConstraint) => (
-                      <Link
-                        routeName={RoutingPath.Violation}
-                        params={{
-                          kind: violation.constraintKind,
-                          name: violation.constraintName,
-                        }}
-                      >
-                        {getResourceName(violation)}
-                      </Link>
-                    ),
+                    getter: (violation: ViolationWithConstraint) => getResourceName(violation),
                   },
                   {
                     label: 'Kind',
@@ -328,6 +318,20 @@ function ViolationsList(props: ViolationsListProps) {
                   {
                     label: 'Message',
                     getter: (violation: any) => violation.message,
+                  },
+                  {
+                    label: 'Actions',
+                    getter: (violation: ViolationWithConstraint) => (
+                      <Link
+                        routeName={RoutingPath.Violation}
+                        params={{
+                          kind: violation.constraintKind,
+                          name: violation.constraintName,
+                        }}
+                      >
+                        View Violations
+                      </Link>
+                    ),
                   },
                 ]}
               />

@@ -29,7 +29,12 @@ export default function ModifySetList(props: { hideTitle?: boolean }) {
   const [kindFilter, setKindFilter] = useState<string>('All');
   const [operationFilter, setOperationFilter] = useState<string>('All');
 
-  ModifySetClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  ModifySetClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const uniqueKinds = useMemo(() => {
     if (!items) return ['All'];

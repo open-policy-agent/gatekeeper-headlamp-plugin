@@ -25,8 +25,9 @@ import {
   buildClusterRedirectPath,
   isSameHistoryLocation,
 } from '../components/ResourceDeleteButton';
+import { ResourceDetailsError, ResourceDetailsLoading } from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
-import { ConstraintClass, requestConstraintTemplates } from '../model';
+import { ConstraintClass } from '../model';
 import { Constraint } from '../types';
 
 interface ConstraintDetailsProps {}
@@ -49,10 +50,20 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
     severity: 'info',
   });
 
-  ConstraintClass.useApiGet(setItem, name, kind);
+  const { constraintPlural, error, loading } = ConstraintClass.useApiGet(setItem, name, kind);
 
-  if (!item) {
-    return <Typography>Loading constraint details...</Typography>;
+  if (error) {
+    return (
+      <ResourceDetailsError
+        error={error}
+        kind={kind ? `${kind} Constraint` : 'Constraint'}
+        name={name}
+      />
+    );
+  }
+
+  if (loading || !item) {
+    return <ResourceDetailsLoading kind="Constraint" />;
   }
 
   // Handle both KubeObject instances and raw constraint objects
@@ -67,103 +78,34 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   };
 
   const handleDeleteConfirm = async () => {
-    console.log('=== DELETE CONSTRAINT DEBUG START ===');
-    console.log('URL params - kind:', kind, 'name:', name);
-    console.log('constraint object:', constraint);
-    console.log('constraint.kind:', constraint?.kind);
+    const constraintName = constraint.metadata?.name;
+    const hasRouteMismatch = Boolean(
+      (kind && constraint.kind !== kind) || (name && constraintName !== name)
+    );
 
-    if (!name || !constraint) {
-      console.error('Cannot delete: name or constraint is missing', { name, constraint });
+    if (!constraintPlural || !constraintName || hasRouteMismatch) {
       setSnackbarState({
         open: true,
-        message: 'Cannot delete: missing constraint information',
+        message: 'Cannot delete: the loaded constraint does not match this route',
         severity: 'error',
       });
       return;
     }
 
-    console.log('Starting delete process for constraint:', {
-      name,
-      urlKind: kind,
-      constraintKind: constraint.kind,
-    });
     const deleteLocation = history.location;
     setIsDeleting(true);
     setDeleteDialogOpen(false);
 
     try {
-      // The 'kind' parameter from the URL is actually the plural form used in the API
-      // But if it's not available, we need to determine it from ConstraintTemplates
-      let constraintPlural = kind ? kind.toLowerCase() : '';
-
-      // If kind from URL is not available or seems like a singular form, try to get the correct plural from ConstraintTemplates
-      if (!constraintPlural || constraintPlural === constraint.kind.toLowerCase()) {
-        try {
-          console.log('Fetching ConstraintTemplates to determine plural form...');
-          const templatesResponse = await requestConstraintTemplates();
-          console.log('ConstraintTemplates response:', templatesResponse);
-
-          if (templatesResponse && templatesResponse.items) {
-            const matchingTemplate = templatesResponse.items.find(
-              (template: any) => template.spec?.crd?.spec?.names?.kind === constraint.kind
-            );
-
-            if (matchingTemplate && matchingTemplate.spec?.crd?.spec?.names?.plural) {
-              constraintPlural = matchingTemplate.spec.crd.spec.names.plural.toLowerCase();
-              console.log(`Found matching template with plural: ${constraintPlural}`);
-            } else {
-              console.warn(`No matching template found for kind: ${constraint.kind}`);
-            }
-          }
-        } catch (templateError: any) {
-          console.warn(
-            'Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization',
-            templateError
-          );
-        }
-      }
-
-      // Fallback to simple pluralization if we couldn't get it from ConstraintTemplates
-      if (!constraintPlural) {
-        const constraintKind = constraint.kind.toLowerCase();
-        console.log(`Using fallback pluralization for kind: ${constraintKind}`);
-
-        if (constraintKind.endsWith('y')) {
-          constraintPlural = constraintKind.slice(0, -1) + 'ies';
-        } else if (
-          constraintKind.endsWith('s') ||
-          constraintKind.endsWith('sh') ||
-          constraintKind.endsWith('ch') ||
-          constraintKind.endsWith('x') ||
-          constraintKind.endsWith('z')
-        ) {
-          constraintPlural = constraintKind + 'es';
-        } else {
-          constraintPlural = constraintKind + 's';
-        }
-        console.log(`Computed plural form: ${constraintPlural}`);
-      }
-
-      if (!constraintPlural) {
-        throw new Error(`Could not determine plural form for constraint kind: ${constraint.kind}`);
-      }
-
-      if (!name) {
-        throw new Error('Constraint name is missing');
-      }
-
-      const deleteUrl = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${name}`;
-      console.log(`Attempting to delete constraint with URL: ${deleteUrl}`);
-      console.log(`Full URL parts - plural: "${constraintPlural}", name: "${name}"`);
+      const deleteUrl = `/apis/constraints.gatekeeper.sh/v1beta1/${constraintPlural}/${constraintName}`;
 
       await ApiProxy.request(deleteUrl, {
         method: 'DELETE',
       });
 
-      console.log('Delete request successful');
       setSnackbarState({
         open: true,
-        message: `Constraint "${name}" deleted successfully`,
+        message: `Constraint "${constraintName}" deleted successfully`,
         severity: 'success',
       });
 
@@ -171,14 +113,6 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         history.replace(buildClusterRedirectPath(deleteLocation.pathname, RoutingPath.Constraints));
       }
     } catch (error: any) {
-      console.error('Failed to delete constraint:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        json: error.json,
-        response: error.response,
-      });
-
       let errorMessage = 'Failed to delete Constraint';
       if (error.json && error.json.message) {
         errorMessage = `Failed to delete Constraint: ${error.json.message}`;

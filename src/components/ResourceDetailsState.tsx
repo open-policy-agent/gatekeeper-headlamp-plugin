@@ -45,28 +45,86 @@ export function getResourceErrorPresentation(
   }
 }
 
+interface ResourceRequestIdentity {
+  resourceClass: KubeObjectClass;
+  name: string;
+  namespace?: string;
+}
+
+interface ResourceDetailsState {
+  request: ResourceRequestIdentity | null;
+  item: KubeObject | null;
+  error: ResourceApiError | null;
+}
+
 export function useResourceDetails(
   resourceClass: KubeObjectClass,
   name: string,
   namespace?: string
 ): { item: KubeObject | null; error: ResourceApiError | null } {
-  const [item, setItem] = React.useState<KubeObject | null>(null);
-  const [error, setError] = React.useState<ResourceApiError | null>(null);
+  const request = React.useMemo(
+    () => ({ resourceClass, name, namespace }),
+    [resourceClass, name, namespace]
+  );
+  const currentRequest = React.useRef(request);
+  currentRequest.current = request;
 
-  const handleGet = React.useCallback((nextItem: KubeObject | null) => {
-    setItem(nextItem);
-    if (nextItem) {
-      setError(null);
-    }
-  }, []);
+  const [state, setState] = React.useState<ResourceDetailsState>({
+    request: null,
+    item: null,
+    error: null,
+  });
 
-  const handleError = React.useCallback((nextError: ResourceApiError | null) => {
-    setError(nextError || new Error('The Kubernetes API request failed without an error message.'));
-  }, []);
+  const handleGet = React.useCallback(
+    (nextItem: KubeObject | null) => {
+      if (currentRequest.current !== request) {
+        return;
+      }
+
+      setState(currentState => {
+        if (currentRequest.current !== request) {
+          return currentState;
+        }
+
+        return {
+          request,
+          item: nextItem,
+          error: nextItem || currentState.request !== request ? null : currentState.error,
+        };
+      });
+    },
+    [request]
+  );
+
+  const handleError = React.useCallback(
+    (nextError: ResourceApiError | null) => {
+      if (currentRequest.current !== request) {
+        return;
+      }
+
+      setState(currentState => {
+        if (currentRequest.current !== request) {
+          return currentState;
+        }
+
+        return {
+          request,
+          item: currentState.request === request ? currentState.item : null,
+          error:
+            nextError || new Error('The Kubernetes API request failed without an error message.'),
+        };
+      });
+    },
+    [request]
+  );
 
   resourceClass.useApiGet(handleGet, name, namespace, handleError);
 
-  return { item, error };
+  if (state.request !== request) {
+    return { item: null, error: null };
+  }
+
+  return { item: state.item, error: state.error };
 }
 
 export function ResourceDetailsLoading({ kind }: { kind: string }) {

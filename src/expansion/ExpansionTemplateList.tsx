@@ -29,7 +29,12 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
   const [kindFilter, setKindFilter] = useState<string>('All');
   const [generatedKindFilter, setGeneratedKindFilter] = useState<string>('All');
 
-  ExpansionTemplateClass.useApiList(setItems, (err: Error) => setError(err));
+  const handleItems = React.useCallback((nextItems: KubeObject[]) => {
+    setError(null);
+    setItems(nextItems);
+  }, []);
+
+  ExpansionTemplateClass.useApiList(handleItems, (err: Error) => setError(err));
 
   const uniqueKinds = useMemo(() => {
     if (!items) return ['All'];

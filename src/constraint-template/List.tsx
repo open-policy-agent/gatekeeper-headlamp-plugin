@@ -16,46 +16,73 @@ import {
   SelectChangeEvent,
   Typography,
 } from '@mui/material';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
-import { ConstraintTemplateClass, requestConstraintTemplates } from '../model';
+import { ConstraintTemplateClass, isNotFoundError, requestConstraintTemplates } from '../model';
 import { ConstraintTemplate } from '../types';
 
 interface ConstraintTemplateListProps {
   hideTitle?: boolean;
 }
 
+function isGatekeeperNotInstalledError(error: unknown): boolean {
+  if (isNotFoundError(error)) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+        error !== null &&
+        typeof (error as { message?: unknown }).message === 'string'
+      ? (error as { message: string }).message
+      : '';
+
+  return /(?:\b404\b|not found|no matches)/i.test(message);
+}
+
 function ConstraintTemplateList(props: ConstraintTemplateListProps) {
   const [constraintTemplates, setConstraintTemplates] = useState<KubeObject[] | null>(null);
   const [selectedTargetFilter, setSelectedTargetFilter] = useState<string>('');
   const [gatekeeperNotInstalled, setGatekeeperNotInstalled] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const history = useHistory();
   const location = useLocation();
 
-  ConstraintTemplateClass.useApiList(setConstraintTemplates);
+  const handleConstraintTemplates = useCallback((items: KubeObject[]) => {
+    setConstraintTemplates(items);
+    setError(null);
+    setGatekeeperNotInstalled(false);
+  }, []);
+
+  const handleConstraintTemplatesError = useCallback((nextError: unknown) => {
+    if (isGatekeeperNotInstalledError(nextError)) {
+      setError(null);
+      setGatekeeperNotInstalled(true);
+      return;
+    }
+
+    setGatekeeperNotInstalled(false);
+    setError(nextError);
+  }, []);
+
+  ConstraintTemplateClass.useApiList(handleConstraintTemplates, handleConstraintTemplatesError);
 
   // Check if Gatekeeper CRD is installed
   useEffect(() => {
     const checkGatekeeperCRD = async () => {
       try {
         await requestConstraintTemplates();
-      } catch (error: any) {
-        // Check if it's a 404 or connection error indicating CRD doesn't exist
-        if (
-          error?.status === 404 ||
-          error?.message?.includes('404') ||
-          error?.message?.includes('not found') ||
-          error?.message?.includes('no matches')
-        ) {
-          console.log('[ConstraintTemplateList] Gatekeeper CRDs not found');
-          setGatekeeperNotInstalled(true);
-        }
+      } catch (nextError: unknown) {
+        handleConstraintTemplatesError(nextError);
       }
     };
 
     checkGatekeeperCRD();
-  }, []);
+  }, [handleConstraintTemplatesError]);
 
   const uniqueTargets = useMemo(() => {
     if (!constraintTemplates) return [];
@@ -101,6 +128,16 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
           </Button>
         </Alert>
       </SectionBox>
+    );
+  }
+
+  if (error !== null) {
+    return (
+      <ResourceListError
+        error={error}
+        resourceName="ConstraintTemplate"
+        sectionTitle={props.hideTitle ? undefined : 'Constraint Templates'}
+      />
     );
   }
 
