@@ -58,9 +58,9 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('../index', () => ({
-  RoutingPath: {
-    Constraint: '/gatekeeper/constraints/:kind/:name',
-    Violation: '/gatekeeper/violations/:kind/:name',
+  RouteName: {
+    Constraint: 'Constraint Details',
+    Violation: 'Violation Details',
   },
 }));
 
@@ -96,7 +96,7 @@ vi.mock('../model', async () => {
   };
 });
 
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import ViolationsList from './List';
 
 afterEach(cleanup);
@@ -110,7 +110,7 @@ describe('ViolationsList', () => {
     expect(screen.queryByRole('link', { name: 'team-a/restricted-pod' })).not.toBeInTheDocument();
 
     const viewViolationsLink = screen.getByRole('link', { name: 'View Violations' });
-    expect(viewViolationsLink).toHaveAttribute('data-route-name', RoutingPath.Violation);
+    expect(viewViolationsLink).toHaveAttribute('data-route-name', RouteName.Violation);
     expect(JSON.parse(viewViolationsLink.getAttribute('data-params') ?? '{}')).toEqual({
       kind: 'K8sRequiredLabels',
       name: 'require-team-label',

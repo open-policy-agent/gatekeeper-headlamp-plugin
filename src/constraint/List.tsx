@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConstraintClass, requestConstraintTemplates } from '../model';
 import { Constraint } from '../types';
 
@@ -207,7 +207,7 @@ function ConstraintList(props: ConstraintListProps) {
               label: 'Name',
               getter: constraint => (
                 <HeadlampLink
-                  routeName={RoutingPath.Constraint}
+                  routeName={RouteName.Constraint}
                   params={{
                     kind: constraint.kind,
                     name: constraint.metadata.name,

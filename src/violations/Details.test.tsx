@@ -28,8 +28,8 @@ vi.mock('react-router-dom', async importOriginal => {
 });
 
 vi.mock('../index', () => ({
-  RoutingPath: {
-    Constraint: '/gatekeeper/constraints/:kind/:name',
+  RouteName: {
+    Constraint: 'Constraint Details',
   },
 }));
 

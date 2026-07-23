@@ -55,11 +55,12 @@ vi.mock('./externaldata/ViolationExportPage', () => ({
   default: () => <div>Violation export page</div>,
 }));
 
-import { RoutingPath } from './index';
+import { RouteName, RoutingPath } from './index';
 
 interface RegisteredRoute {
   component: () => React.ReactElement;
   exact?: boolean;
+  name: string;
   path: string;
   sidebar: string;
 }
@@ -84,6 +85,14 @@ function getRoute(path: string) {
 }
 
 describe('Gatekeeper route registration', () => {
+  it('keeps every registered route name aligned with its exported route-name constant', () => {
+    expect(Object.keys(RouteName).sort()).toEqual(Object.keys(RoutingPath).sort());
+
+    Object.entries(RoutingPath).forEach(([key, path]) => {
+      expect(getRoute(path).name).toBe(RouteName[key as keyof typeof RouteName]);
+    });
+  });
+
   it('registers every route-addressable tab and compatibility URL', () => {
     [
       RoutingPath.ConstraintTemplates,

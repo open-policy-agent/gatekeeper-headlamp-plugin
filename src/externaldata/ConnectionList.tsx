@@ -7,7 +7,7 @@ import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Box, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 import ResourceListError from '../components/ResourceListError';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConnectionClass } from '../model';
 import { getConnectionDriver } from '../resourceData';
 
@@ -84,7 +84,7 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
             label: 'Name',
             getter: item => (
               <HeadlampLink
-                routeName={RoutingPath.Connection}
+                routeName={RouteName.Connection}
                 params={{ namespace: item.metadata.namespace || '-', name: item.metadata.name }}
               >
                 {item.metadata.name}

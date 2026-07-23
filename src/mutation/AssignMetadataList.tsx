@@ -7,7 +7,7 @@ import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Box, Chip, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 import ResourceListError from '../components/ResourceListError';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { AssignMetadataClass } from '../model';
 
 function getTargetKinds(item: any): string[] {
@@ -91,7 +91,7 @@ export default function AssignMetadataList(props: { hideTitle?: boolean }) {
             label: 'Name',
             getter: item => (
               <HeadlampLink
-                routeName={RoutingPath.AssignMetadata}
+                routeName={RouteName.AssignMetadata}
                 params={{ name: item.metadata.name }}
               >
                 {item.metadata.name}

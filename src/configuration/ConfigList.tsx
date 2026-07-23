@@ -7,7 +7,7 @@ import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Box, Chip, Typography } from '@mui/material';
 import React, { useState } from 'react';
 import ResourceListError from '../components/ResourceListError';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConfigClass } from '../model';
 
 export default function ConfigList(props: { hideTitle?: boolean }) {
@@ -44,7 +44,7 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
             label: 'Name',
             getter: item => (
               <HeadlampLink
-                routeName={RoutingPath.Config}
+                routeName={RouteName.Config}
                 params={{ namespace: item.metadata.namespace || '-', name: item.metadata.name }}
               >
                 {item.metadata.name}

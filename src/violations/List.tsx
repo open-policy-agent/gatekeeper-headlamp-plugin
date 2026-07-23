@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import React, { useEffect, useMemo, useState } from 'react'; // Added useMemo, useEffect
 import { useHistory, useLocation } from 'react-router-dom';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConstraintClass, requestConstraintTemplates } from '../model';
 import { Constraint, Violation } from '../types';
 
@@ -297,7 +297,7 @@ function ViolationsList(props: ViolationsListProps) {
                     label: 'Constraint',
                     getter: (violation: any) => (
                       <Link
-                        routeName={RoutingPath.Constraint}
+                        routeName={RouteName.Constraint}
                         params={{
                           kind: violation.constraintKind,
                           name: violation.constraintName,
@@ -323,7 +323,7 @@ function ViolationsList(props: ViolationsListProps) {
                     label: 'Actions',
                     getter: (violation: ViolationWithConstraint) => (
                       <Link
-                        routeName={RoutingPath.Violation}
+                        routeName={RouteName.Violation}
                         params={{
                           kind: violation.constraintKind,
                           name: violation.constraintName,

@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import React, { useCallback, useEffect, useState } from 'react';
+import { RouteName } from '../index';
 import GitHubRequestControls from './GitHubRequestControls';
 import {
   fetchLibraryTemplates,
@@ -180,7 +181,7 @@ function LibraryList() {
                 label: 'Name',
                 getter: item => (
                   <Link
-                    routeName="Library Template Details"
+                    routeName={RouteName.LibraryTemplate}
                     params={getCanonicalTemplateRouteParams(item)}
                     state={{ template: item }}
                   >

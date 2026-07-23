@@ -23,7 +23,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
 }));
 
 vi.mock('../index', () => ({
-  RoutingPath: { Config: '/gatekeeper/config/:namespace/:name' },
+  RouteName: { Config: 'Config Details' },
 }));
 
 vi.mock('../model', () => ({

@@ -68,6 +68,54 @@ export namespace RoutingPath {
   export const ExpansionTemplate = '/gatekeeper/expansion/expansiontemplates/:name';
 }
 
+export namespace RouteName {
+  // Library
+  export const Library = 'Policy Library';
+  export const LibraryTemplate = 'Library Template Details';
+  export const LegacyLibraryTemplate = 'Library Template Details (Legacy URL)';
+
+  // Policies / Constraints
+  export const ConstraintTemplates = 'Constraint Templates';
+  export const ConstraintTemplate = 'Constraint Template Details';
+  export const Constraints = 'Constraints';
+  export const Constraint = 'Constraint Details';
+  export const Violations = 'Violations';
+  export const Violation = 'Violation Details';
+
+  // Mutations
+  export const Mutations = 'Mutations';
+  export const Assigns = 'Assign Mutations';
+  export const Assign = 'Assign Details';
+  export const AssignMetadatas = 'AssignMetadata Mutations';
+  export const AssignMetadata = 'AssignMetadata Details';
+  export const AssignImages = 'AssignImage Mutations';
+  export const AssignImage = 'AssignImage Details';
+  export const ModifySets = 'ModifySet Mutations';
+  export const ModifySet = 'ModifySet Details';
+
+  // Configuration
+  export const Configuration = 'Configurations';
+  export const Configs = 'Gatekeeper Configs';
+  export const Config = 'Config Details';
+  export const SyncSets = 'Gatekeeper SyncSets';
+  export const SyncSet = 'SyncSet Details';
+
+  // External Data
+  export const ExternalData = 'External Data';
+  export const Providers = 'External Data Providers';
+  export const Provider = 'Provider Details';
+
+  // Violation export (connection.gatekeeper.sh)
+  export const ViolationExport = 'Violation Export';
+  export const Connection = 'Violation Export Connection Details';
+  export const Connections = 'Violation Export (Legacy URL)';
+  export const LegacyConnection = 'Violation Export Connection Details (Legacy URL)';
+
+  // Expansion
+  export const ExpansionTemplates = 'Expansion Templates';
+  export const ExpansionTemplate = 'ExpansionTemplate Details';
+}
+
 // Register sidebar items
 registerSidebarEntry({
   parent: null,
@@ -130,7 +178,7 @@ registerSidebarEntry({
 registerRoute({
   path: RoutingPath.Library,
   sidebar: 'gatekeeper-library',
-  name: 'Policy Library',
+  name: RouteName.Library,
   exact: true,
   component: () => <LibraryList />,
 });
@@ -138,7 +186,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Constraints,
   sidebar: 'gatekeeper-constraints',
-  name: 'Constraints',
+  name: RouteName.Constraints,
   exact: true,
   component: () => <ConstraintsPage />,
 });
@@ -146,7 +194,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ConstraintTemplates,
   sidebar: 'gatekeeper-constraints',
-  name: 'Constraint Templates',
+  name: RouteName.ConstraintTemplates,
   exact: true,
   component: () => <ConstraintsPage />,
 });
@@ -154,7 +202,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Violations,
   sidebar: 'gatekeeper-constraints',
-  name: 'Violations',
+  name: RouteName.Violations,
   exact: true,
   component: () => <ConstraintsPage />,
 });
@@ -162,7 +210,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Mutations,
   sidebar: 'gatekeeper-mutations',
-  name: 'Mutations',
+  name: RouteName.Mutations,
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -170,7 +218,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Assigns,
   sidebar: 'gatekeeper-mutations',
-  name: 'Assign Mutations',
+  name: RouteName.Assigns,
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -178,7 +226,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.AssignMetadatas,
   sidebar: 'gatekeeper-mutations',
-  name: 'AssignMetadata Mutations',
+  name: RouteName.AssignMetadatas,
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -186,7 +234,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.AssignImages,
   sidebar: 'gatekeeper-mutations',
-  name: 'AssignImage Mutations',
+  name: RouteName.AssignImages,
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -194,7 +242,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ModifySets,
   sidebar: 'gatekeeper-mutations',
-  name: 'ModifySet Mutations',
+  name: RouteName.ModifySets,
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -202,7 +250,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Configuration,
   sidebar: 'gatekeeper-configuration',
-  name: 'Configurations',
+  name: RouteName.Configuration,
   exact: true,
   component: () => <ConfigurationPage />,
 });
@@ -210,7 +258,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Configs,
   sidebar: 'gatekeeper-configuration',
-  name: 'Gatekeeper Configs',
+  name: RouteName.Configs,
   exact: true,
   component: () => <ConfigurationPage />,
 });
@@ -218,7 +266,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.SyncSets,
   sidebar: 'gatekeeper-configuration',
-  name: 'Gatekeeper SyncSets',
+  name: RouteName.SyncSets,
   exact: true,
   component: () => <ConfigurationPage />,
 });
@@ -226,7 +274,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ExternalData,
   sidebar: 'gatekeeper-externaldata',
-  name: 'External Data',
+  name: RouteName.ExternalData,
   exact: true,
   component: () => <ExternalDataPage />,
 });
@@ -234,7 +282,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Providers,
   sidebar: 'gatekeeper-externaldata',
-  name: 'External Data Providers',
+  name: RouteName.Providers,
   exact: true,
   component: () => <ExternalDataPage />,
 });
@@ -242,7 +290,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ViolationExport,
   sidebar: 'gatekeeper-violation-export',
-  name: 'Violation Export',
+  name: RouteName.ViolationExport,
   exact: true,
   component: () => <ViolationExportPage />,
 });
@@ -250,7 +298,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Connections,
   sidebar: 'gatekeeper-violation-export',
-  name: 'Violation Export (Legacy URL)',
+  name: RouteName.Connections,
   exact: true,
   component: () => <ViolationExportPage />,
 });
@@ -258,7 +306,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ExpansionTemplates,
   sidebar: 'gatekeeper-expansion',
-  name: 'Expansion Templates',
+  name: RouteName.ExpansionTemplates,
   exact: true,
   component: () => <ExpansionTemplateList />,
 });
@@ -267,7 +315,7 @@ registerRoute({
 // Register the legacy two-segment route first because it also matches the canonical pattern.
 registerRoute({
   path: RoutingPath.LegacyLibraryTemplate,
-  name: 'Library Template Details (Legacy URL)',
+  name: RouteName.LegacyLibraryTemplate,
   exact: true,
   sidebar: 'gatekeeper-library',
   component: () => <LibraryTemplateDetails />,
@@ -275,7 +323,7 @@ registerRoute({
 
 registerRoute({
   path: RoutingPath.LibraryTemplate,
-  name: 'Library Template Details',
+  name: RouteName.LibraryTemplate,
   exact: true,
   sidebar: 'gatekeeper-library',
   component: () => <LibraryTemplateDetails />,
@@ -283,7 +331,7 @@ registerRoute({
 
 registerRoute({
   path: RoutingPath.ConstraintTemplate,
-  name: 'Constraint Template Details',
+  name: RouteName.ConstraintTemplate,
   exact: true,
   sidebar: 'gatekeeper-constraints',
   component: () => <ConstraintTemplateDetails />,
@@ -291,7 +339,7 @@ registerRoute({
 
 registerRoute({
   path: RoutingPath.Constraint,
-  name: 'Constraint Details',
+  name: RouteName.Constraint,
   exact: true,
   sidebar: 'gatekeeper-constraints',
   component: () => <ConstraintDetails />,
@@ -299,7 +347,7 @@ registerRoute({
 
 registerRoute({
   path: RoutingPath.Violation,
-  name: 'Violation Details',
+  name: RouteName.Violation,
   exact: true,
   sidebar: 'gatekeeper-constraints',
   component: () => <ViolationsDetails />,
@@ -308,7 +356,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Assign,
   sidebar: 'gatekeeper-mutations',
-  name: 'Assign Details',
+  name: RouteName.Assign,
   exact: true,
   component: () => <AssignDetails />,
 });
@@ -316,7 +364,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.AssignMetadata,
   sidebar: 'gatekeeper-mutations',
-  name: 'AssignMetadata Details',
+  name: RouteName.AssignMetadata,
   exact: true,
   component: () => <AssignMetadataDetails />,
 });
@@ -324,7 +372,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.AssignImage,
   sidebar: 'gatekeeper-mutations',
-  name: 'AssignImage Details',
+  name: RouteName.AssignImage,
   exact: true,
   component: () => <AssignImageDetails />,
 });
@@ -332,7 +380,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ModifySet,
   sidebar: 'gatekeeper-mutations',
-  name: 'ModifySet Details',
+  name: RouteName.ModifySet,
   exact: true,
   component: () => <ModifySetDetails />,
 });
@@ -340,7 +388,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Config,
   sidebar: 'gatekeeper-configuration',
-  name: 'Config Details',
+  name: RouteName.Config,
   exact: true,
   component: () => <ConfigDetails />,
 });
@@ -348,7 +396,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.SyncSet,
   sidebar: 'gatekeeper-configuration',
-  name: 'SyncSet Details',
+  name: RouteName.SyncSet,
   exact: true,
   component: () => <SyncSetDetails />,
 });
@@ -356,7 +404,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Provider,
   sidebar: 'gatekeeper-externaldata',
-  name: 'Provider Details',
+  name: RouteName.Provider,
   exact: true,
   component: () => <ProviderDetails />,
 });
@@ -364,7 +412,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.Connection,
   sidebar: 'gatekeeper-violation-export',
-  name: 'Violation Export Connection Details',
+  name: RouteName.Connection,
   exact: true,
   component: () => <ConnectionDetails />,
 });
@@ -372,7 +420,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.LegacyConnection,
   sidebar: 'gatekeeper-violation-export',
-  name: 'Violation Export Connection Details (Legacy URL)',
+  name: RouteName.LegacyConnection,
   exact: true,
   component: () => <ConnectionDetails />,
 });
@@ -380,7 +428,7 @@ registerRoute({
 registerRoute({
   path: RoutingPath.ExpansionTemplate,
   sidebar: 'gatekeeper-expansion',
-  name: 'ExpansionTemplate Details',
+  name: RouteName.ExpansionTemplate,
   exact: true,
   component: () => <ExpansionTemplateDetails />,
 });

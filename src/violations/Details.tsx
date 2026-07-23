@@ -3,7 +3,7 @@ import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@m
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ResourceDetailsError, ResourceDetailsLoading } from '../components/ResourceDetailsState';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConstraintClass } from '../model';
 
 interface ViolationsDetailsProps {}
@@ -44,7 +44,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
         name: 'Constraint Name',
         value: (
           <Link
-            routeName={RoutingPath.Constraint}
+            routeName={RouteName.Constraint}
             params={{
               kind: constraint.kind,
               name: constraint.metadata.name,

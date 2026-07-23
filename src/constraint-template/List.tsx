@@ -19,7 +19,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import ResourceListError from '../components/ResourceListError';
-import { RoutingPath } from '../index';
+import { RouteName } from '../index';
 import { ConstraintTemplateClass, isNotFoundError, requestConstraintTemplates } from '../model';
 import { ConstraintTemplate } from '../types';
 
@@ -199,7 +199,7 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
               label: 'Name',
               getter: (template: any) => (
                 <HeadlampLink
-                  routeName={RoutingPath.ConstraintTemplate}
+                  routeName={RouteName.ConstraintTemplate}
                   params={{
                     name: template.metadata.name,
                   }}
