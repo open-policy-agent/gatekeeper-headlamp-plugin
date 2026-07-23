@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   useApiGet: vi.fn(),
 }));
 
+vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s', () => ({
+  useCluster: () => null,
+}));
+
 vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SectionBox: ({ children }: { children: React.ReactNode }) => <>{children}</>,

@@ -22,6 +22,34 @@ function makeResource(deleteResource: () => Promise<unknown>): KubeObject {
 }
 
 describe('ResourceDeleteButton', () => {
+  it('renders an optional consequence warning without replacing the confirmation text', async () => {
+    const user = userEvent.setup();
+    const history = createMemoryHistory({
+      initialEntries: ['/gatekeeper/constrainttemplates/example'],
+    });
+
+    render(
+      <Router history={history}>
+        <ResourceDeleteButton
+          resource={makeResource(vi.fn().mockResolvedValue(undefined))}
+          kind="ConstraintTemplate"
+          redirectUrl="/gatekeeper/constrainttemplates"
+          warningText="Dependent policy instances may be removed."
+        />
+      </Router>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'Are you sure you want to delete the ConstraintTemplate "example"? This action cannot be undone.'
+      )
+    ).toBeVisible();
+    expect(within(dialog).getByText('Dependent policy instances may be removed.')).toBeVisible();
+  });
+
   it('deletes through the loaded KubeObject and replaces history with its list route', async () => {
     const user = userEvent.setup();
     const deleteResource = vi.fn().mockResolvedValue(undefined);

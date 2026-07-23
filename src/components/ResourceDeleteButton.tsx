@@ -17,6 +17,7 @@ interface ResourceDeleteButtonProps {
   resource: KubeObject;
   kind: string;
   redirectUrl: string;
+  warningText?: string;
 }
 
 interface ComparableLocation {
@@ -61,6 +62,7 @@ export default function ResourceDeleteButton({
   resource,
   kind,
   redirectUrl,
+  warningText,
 }: ResourceDeleteButtonProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -115,6 +117,7 @@ export default function ResourceDeleteButton({
           <DialogContentText>
             Are you sure you want to delete the {kind} "{name}"? This action cannot be undone.
           </DialogContentText>
+          {warningText && <DialogContentText sx={{ mt: 2 }}>{warningText}</DialogContentText>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} color="primary">

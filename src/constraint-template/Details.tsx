@@ -54,6 +54,7 @@ export default function ConstraintTemplateDetails() {
           resource={item}
           kind="ConstraintTemplate"
           redirectUrl={RoutingPath.ConstraintTemplates}
+          warningText="Deleting this ConstraintTemplate may also remove or otherwise affect dependent constraints (policy instances) that use this template."
         />
       </Box>
 

@@ -16,6 +16,10 @@ vi.mock('@kinvolk/headlamp-plugin/lib/ApiProxy', () => ({
   request: mocks.apiRequest,
 }));
 
+vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s', () => ({
+  useCluster: () => null,
+}));
+
 vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
   SectionBox: ({ children, title }: { children: React.ReactNode; title: string }) => (
     <section>

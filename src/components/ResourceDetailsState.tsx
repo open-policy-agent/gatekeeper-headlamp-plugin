@@ -1,3 +1,4 @@
+import { useCluster } from '@kinvolk/headlamp-plugin/lib/lib/k8s';
 import { KubeObject, type KubeObjectClass } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Alert, AlertTitle, Box, Typography } from '@mui/material';
 import React from 'react';
@@ -46,6 +47,7 @@ export function getResourceErrorPresentation(
 }
 
 interface ResourceRequestIdentity {
+  cluster: string | null;
   resourceClass: KubeObjectClass;
   name: string;
   namespace?: string;
@@ -62,9 +64,10 @@ export function useResourceDetails(
   name: string,
   namespace?: string
 ): { item: KubeObject | null; error: ResourceApiError | null } {
+  const cluster = useCluster();
   const request = React.useMemo(
-    () => ({ resourceClass, name, namespace }),
-    [resourceClass, name, namespace]
+    () => ({ cluster, resourceClass, name, namespace }),
+    [cluster, resourceClass, name, namespace]
   );
   const currentRequest = React.useRef(request);
   currentRequest.current = request;
@@ -118,7 +121,9 @@ export function useResourceDetails(
     [request]
   );
 
-  resourceClass.useApiGet(handleGet, name, namespace, handleError);
+  resourceClass.useApiGet(handleGet, name, namespace, handleError, {
+    cluster: cluster ?? undefined,
+  });
 
   if (state.request !== request) {
     return { item: null, error: null };
