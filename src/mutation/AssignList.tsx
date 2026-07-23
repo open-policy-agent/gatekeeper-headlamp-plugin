@@ -4,8 +4,9 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Box, FormControl, InputLabel, Select, MenuItem, Chip } from '@mui/material';
-import React, { useState, useMemo } from 'react';
+import { Box, Chip, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { AssignClass } from '../model';
 
@@ -46,11 +47,11 @@ export default function AssignList(props: { hideTitle?: boolean }) {
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Assign Mutation"}>
-        <Typography color="textSecondary">
-          Error loading Assign Mutation. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="Assign mutations"
+        sectionTitle={props.hideTitle ? undefined : 'Assign Mutation'}
+      />
     );
   }
 
@@ -59,7 +60,7 @@ export default function AssignList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Assign Mutation"}>
+    <SectionBox title={props.hideTitle ? undefined : 'Assign Mutation'}>
       <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 200 }} size="small">
           <InputLabel id="kind-filter-label">Target Kind</InputLabel>
@@ -67,9 +68,9 @@ export default function AssignList(props: { hideTitle?: boolean }) {
             labelId="kind-filter-label"
             value={kindFilter}
             label="Target Kind"
-            onChange={(e) => setKindFilter(e.target.value as string)}
+            onChange={e => setKindFilter(e.target.value as string)}
           >
-            {uniqueKinds.map((k) => (
+            {uniqueKinds.map(k => (
               <MenuItem key={k} value={k}>
                 {k}
               </MenuItem>
@@ -83,41 +84,40 @@ export default function AssignList(props: { hideTitle?: boolean }) {
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
-              <HeadlampLink
-                routeName={RoutingPath.Assign}
-                params={{ name: item.metadata.name }}
-              >
+            getter: item => (
+              <HeadlampLink routeName={RoutingPath.Assign} params={{ name: item.metadata.name }}>
                 {item.metadata.name}
               </HeadlampLink>
             ),
           },
           {
             label: 'Target Kinds',
-            getter: (item) => {
+            getter: item => {
               const kinds = getTargetKinds(item);
               if (kinds.length === 0) return '-';
               return (
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {kinds.map(k => <Chip key={k} label={k} size="small" variant="outlined" />)}
+                  {kinds.map(k => (
+                    <Chip key={k} label={k} size="small" variant="outlined" />
+                  ))}
                 </Box>
               );
             },
           },
           {
             label: 'Location',
-            getter: (item) => item.jsonData?.spec?.location || '-',
+            getter: item => item.jsonData?.spec?.location || '-',
           },
           {
             label: 'Assign Value',
-            getter: (item) => {
+            getter: item => {
               const val = item.jsonData?.spec?.parameters?.assign?.value;
               return val !== undefined ? JSON.stringify(val) : '-';
             },
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

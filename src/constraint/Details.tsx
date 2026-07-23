@@ -1,31 +1,33 @@
+import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import {
+  Alert,
   Box,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
   Button,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
   Snackbar,
-  Alert,
-  CircularProgress
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Typography,
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useParams, useHistory, useLocation } from 'react-router-dom';
-import { ConstraintClass } from '../model';
-import { Constraint } from '../types';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { useHistory, useParams } from 'react-router-dom';
+import {
+  buildClusterRedirectPath,
+  isSameHistoryLocation,
+} from '../components/ResourceDeleteButton';
 import { RoutingPath } from '../index';
+import { ConstraintClass, requestConstraintTemplates } from '../model';
+import { Constraint } from '../types';
 
 interface ConstraintDetailsProps {}
 
@@ -33,7 +35,6 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
   const { kind, name } = useParams<{ kind: string; name: string }>();
   const [item, setItem] = useState<any | null>(null);
   const history = useHistory();
-  const location = useLocation();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -81,7 +82,12 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       return;
     }
 
-    console.log('Starting delete process for constraint:', { name, urlKind: kind, constraintKind: constraint.kind });
+    console.log('Starting delete process for constraint:', {
+      name,
+      urlKind: kind,
+      constraintKind: constraint.kind,
+    });
+    const deleteLocation = history.location;
     setIsDeleting(true);
     setDeleteDialogOpen(false);
 
@@ -94,12 +100,12 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       if (!constraintPlural || constraintPlural === constraint.kind.toLowerCase()) {
         try {
           console.log('Fetching ConstraintTemplates to determine plural form...');
-          const templatesResponse = await ApiProxy.request('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+          const templatesResponse = await requestConstraintTemplates();
           console.log('ConstraintTemplates response:', templatesResponse);
 
           if (templatesResponse && templatesResponse.items) {
-            const matchingTemplate = templatesResponse.items.find((template: any) =>
-              template.spec?.crd?.spec?.names?.kind === constraint.kind
+            const matchingTemplate = templatesResponse.items.find(
+              (template: any) => template.spec?.crd?.spec?.names?.kind === constraint.kind
             );
 
             if (matchingTemplate && matchingTemplate.spec?.crd?.spec?.names?.plural) {
@@ -110,7 +116,10 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             }
           }
         } catch (templateError: any) {
-          console.warn('Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization', templateError);
+          console.warn(
+            'Failed to fetch ConstraintTemplates for plural form, falling back to simple pluralization',
+            templateError
+          );
         }
       }
 
@@ -121,7 +130,13 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
         if (constraintKind.endsWith('y')) {
           constraintPlural = constraintKind.slice(0, -1) + 'ies';
-        } else if (constraintKind.endsWith('s') || constraintKind.endsWith('sh') || constraintKind.endsWith('ch') || constraintKind.endsWith('x') || constraintKind.endsWith('z')) {
+        } else if (
+          constraintKind.endsWith('s') ||
+          constraintKind.endsWith('sh') ||
+          constraintKind.endsWith('ch') ||
+          constraintKind.endsWith('x') ||
+          constraintKind.endsWith('z')
+        ) {
           constraintPlural = constraintKind + 'es';
         } else {
           constraintPlural = constraintKind + 's';
@@ -141,12 +156,9 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       console.log(`Attempting to delete constraint with URL: ${deleteUrl}`);
       console.log(`Full URL parts - plural: "${constraintPlural}", name: "${name}"`);
 
-      await ApiProxy.request(
-        deleteUrl,
-        {
-          method: 'DELETE',
-        }
-      );
+      await ApiProxy.request(deleteUrl, {
+        method: 'DELETE',
+      });
 
       console.log('Delete request successful');
       setSnackbarState({
@@ -155,26 +167,16 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         severity: 'success',
       });
 
-      // Navigate back to constraints list after a short delay
-      setTimeout(() => {
-        // Extract cluster from current URL (format: /c/:cluster/...)
-        const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
-        const cluster = clusterMatch ? clusterMatch[1] : null;
-        
-        if (cluster) {
-          history.push(`/c/${cluster}${RoutingPath.Constraints}`);
-        } else {
-          history.push(RoutingPath.Constraints);
-        }
-      }, 1500);
-
+      if (isSameHistoryLocation(history.location, deleteLocation)) {
+        history.replace(buildClusterRedirectPath(deleteLocation.pathname, RoutingPath.Constraints));
+      }
     } catch (error: any) {
       console.error('Failed to delete constraint:', error);
       console.error('Error details:', {
         message: error.message,
         status: error.status,
         json: error.json,
-        response: error.response
+        response: error.response,
       });
 
       let errorMessage = 'Failed to delete Constraint';
@@ -311,7 +313,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -332,7 +334,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {getMatchRules().map((row) => (
+            {getMatchRules().map(row => (
               <TableRow key={row.Index}>
                 <TableCell>{row.Property}</TableCell>
                 <TableCell>{row.Value}</TableCell>
@@ -352,7 +354,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {getViolationRows().map((row) => (
+            {getViolationRows().map(row => (
               <TableRow key={row.Index}>
                 <TableCell>{row.Resource}</TableCell>
                 <TableCell>{row.Namespace}</TableCell>
@@ -370,13 +372,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
       >
-        <DialogTitle id="delete-dialog-title">
-          Delete Constraint
-        </DialogTitle>
+        <DialogTitle id="delete-dialog-title">Delete Constraint</DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
-            Are you sure you want to delete the {constraint.kind} constraint "{constraint.metadata.name}"?
-            This action cannot be undone.
+            Are you sure you want to delete the {constraint.kind} constraint "
+            {constraint.metadata.name}"? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -396,7 +396,11 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarState.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbarState.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbarState.message}
         </Alert>
       </Snackbar>

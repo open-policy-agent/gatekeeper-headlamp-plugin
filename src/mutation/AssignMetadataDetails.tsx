@@ -1,31 +1,27 @@
-import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import {
-  Alert,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography,
-  Chip
-} from '@mui/material';
-import React, { useState } from 'react';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { AssignMetadataClass } from '../model';
+import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
+import {
+  ResourceDetailsError,
+  ResourceDetailsLoading,
+  useResourceDetails,
+} from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
+import { AssignMetadataClass } from '../model';
 
 export default function AssignMetadataDetails() {
   const { name } = useParams<{ name: string }>();
-  const [item, setItem] = useState<KubeObject | null>(null);
+  const { item, error } = useResourceDetails(AssignMetadataClass, name);
 
-  AssignMetadataClass.useApiGet(setItem, name);
+  if (error) {
+    return <ResourceDetailsError error={error} kind="AssignMetadata" name={name} />;
+  }
 
   if (!item) {
-    return <Typography>Loading AssignMetadata Mutation details...</Typography>;
+    return <ResourceDetailsLoading kind="AssignMetadata Mutation" />;
   }
 
   const data = item.jsonData as any;
@@ -44,7 +40,9 @@ export default function AssignMetadataDetails() {
     if (kindsArr.length === 0) return '-';
     return (
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-        {kindsArr.map(k => <Chip key={k} label={k} size="small" variant="outlined" />)}
+        {kindsArr.map(k => (
+          <Chip key={k} label={k} size="small" variant="outlined" />
+        ))}
       </Box>
     );
   }
@@ -77,15 +75,13 @@ export default function AssignMetadataDetails() {
       },
       {
         name: 'Assign Value',
-        value: data.spec?.parameters?.assign?.value !== undefined ? JSON.stringify(data.spec.parameters.assign.value) : '-',
-      }
+        value:
+          data.spec?.parameters?.assign?.value !== undefined
+            ? JSON.stringify(data.spec.parameters.assign.value)
+            : '-',
+      },
     ];
   }
-  
-  
-  const apiUrl = data.metadata.namespace 
-      ? `/apis/mutations.gatekeeper.sh/v1beta1/namespaces/${data.metadata.namespace}/assignmetadata/${data.metadata.name}`
-      : `/apis/mutations.gatekeeper.sh/v1beta1/assignmetadata/${data.metadata.name}`;
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
@@ -99,17 +95,16 @@ export default function AssignMetadataDetails() {
           </Typography>
         </Box>
         <ResourceDeleteButton
-          name={data.metadata.name}
+          resource={item}
           kind="AssignMetadata"
-          apiUrl={apiUrl}
-          redirectUrl={RoutingPath.Mutations}
+          redirectUrl={RoutingPath.AssignMetadatas}
         />
       </Box>
 
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -120,37 +115,8 @@ export default function AssignMetadataDetails() {
           </TableBody>
         </Table>
       </SectionBox>
-      
-      
-      <SectionBox title="System Sync Status">
-        {(data.status?.errors && data.status.errors.length > 0) || (data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0)) ? (
-          <Box>
-            {data.status?.errors && data.status.errors.length > 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                <strong>Global Error:</strong> {JSON.stringify(data.status.errors)}
-              </Alert>
-            )}
-            {data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0) && (
-              <Alert severity="error">
-                <strong>Sync Error:</strong> Failed to load this rule in Gatekeeper.
-                <ul style={{ margin: 0, paddingLeft: '20px', marginTop: '8px' }}>
-                  {data.status.byPod.filter((p: any) => p.errors && p.errors.length > 0).map((p: any) => (
-                    <li key={p.id}>{p.id}: {JSON.stringify(p.errors)}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-          </Box>
-        ) : (data.status?.byPod?.length > 0 && data.status.byPod.every((p: any) => p.enforced === true)) ? (
-          <Alert severity="success">
-            Active and successfully synced (enforced).
-          </Alert>
-        ) : (
-          <Alert severity="info">
-            Pending or not enforced.
-          </Alert>
-        )}
-      </SectionBox>
+
+      <GatekeeperResourceStatus resource={data} readinessField="enforced" />
     </Box>
   );
 }

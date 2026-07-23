@@ -1,31 +1,27 @@
-import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import {
-  Alert,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography,
-  Chip
-} from '@mui/material';
-import React, { useState } from 'react';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { SyncSetClass } from '../model';
+import { NoPerResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
+import {
+  ResourceDetailsError,
+  ResourceDetailsLoading,
+  useResourceDetails,
+} from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
+import { SyncSetClass } from '../model';
 
 export default function SyncSetDetails() {
   const { name } = useParams<{ name: string }>();
-  const [item, setItem] = useState<KubeObject | null>(null);
+  const { item, error } = useResourceDetails(SyncSetClass, name);
 
-  SyncSetClass.useApiGet(setItem, name);
+  if (error) {
+    return <ResourceDetailsError error={error} kind="SyncSet" name={name} />;
+  }
 
   if (!item) {
-    return <Typography>Loading SyncSet details...</Typography>;
+    return <ResourceDetailsLoading kind="SyncSet" />;
   }
 
   const data = item.jsonData as any;
@@ -50,19 +46,21 @@ export default function SyncSetDetails() {
       },
     ];
   }
-  
+
   function getGvksRows() {
     const gvks = data.spec?.gvks;
     if (!Array.isArray(gvks)) return [];
     return gvks.map((gvk: any, i: number) => ({
       name: `Synced GVK ${i + 1}`,
-      value: <Chip label={`${gvk.group || 'core'}/${gvk.version} ${gvk.kind}`} size="small" variant="outlined" />
+      value: (
+        <Chip
+          label={`${gvk.group || 'core'}/${gvk.version} ${gvk.kind}`}
+          size="small"
+          variant="outlined"
+        />
+      ),
     }));
   }
-
-  const apiUrl = data.metadata.namespace 
-      ? `/apis/syncset.gatekeeper.sh/v1alpha1/namespaces/${data.metadata.namespace}/syncsets/${data.metadata.name}`
-      : `/apis/syncset.gatekeeper.sh/v1alpha1/syncsets/${data.metadata.name}`;
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
@@ -75,18 +73,13 @@ export default function SyncSetDetails() {
             SyncSet
           </Typography>
         </Box>
-        <ResourceDeleteButton
-          name={data.metadata.name}
-          kind="SyncSet"
-          apiUrl={apiUrl}
-          redirectUrl={RoutingPath.Configuration}
-        />
+        <ResourceDeleteButton resource={item} kind="SyncSet" redirectUrl={RoutingPath.SyncSets} />
       </Box>
 
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -102,7 +95,7 @@ export default function SyncSetDetails() {
         <SectionBox title="Synced GVKs">
           <Table>
             <TableBody>
-              {getGvksRows().map((row) => (
+              {getGvksRows().map(row => (
                 <TableRow key={row.name}>
                   <TableCell component="th" scope="row">
                     {row.name}
@@ -114,8 +107,8 @@ export default function SyncSetDetails() {
           </Table>
         </SectionBox>
       )}
-    
-      
+
+      <NoPerResourceStatus kind="SyncSet" />
     </Box>
   );
 }

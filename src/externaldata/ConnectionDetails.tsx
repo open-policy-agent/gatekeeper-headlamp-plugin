@@ -1,30 +1,31 @@
-import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import {
-  Alert,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography,
-} from '@mui/material';
-import React, { useState } from 'react';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { ConnectionClass } from '../model';
+import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
+import {
+  ResourceDetailsError,
+  ResourceDetailsLoading,
+  useResourceDetails,
+} from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
+import { ConnectionClass } from '../model';
 
 export default function ConnectionDetails() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const [item, setItem] = useState<KubeObject | null>(null);
+  const { item, error } = useResourceDetails(
+    ConnectionClass,
+    name,
+    namespace || 'gatekeeper-system'
+  );
 
-  ConnectionClass.useApiGet(setItem, name, namespace || 'gatekeeper-system');
+  if (error) {
+    return <ResourceDetailsError error={error} kind="Connection" name={name} />;
+  }
 
   if (!item) {
-    return <Typography>Loading External Data Connection details...</Typography>;
+    return <ResourceDetailsLoading kind="Violation Export Connection" />;
   }
 
   const data = item.jsonData as any;
@@ -50,25 +51,21 @@ export default function ConnectionDetails() {
       {
         name: 'Driver',
         value: data.spec?.driver || '-',
-      }
+      },
     ];
   }
-  
+
   function getConfigRows() {
     const config = data.spec?.config;
     if (!config || typeof config !== 'object') return [];
-    
+
     return Object.entries(config).map(([key, value]) => ({
       name: key,
-      value: String(value)
+      value: String(value),
     }));
   }
-  
-    const configRows = getConfigRows();
 
-  const apiUrl = data.metadata.namespace 
-      ? `/apis/connection.gatekeeper.sh/v1alpha1/namespaces/${data.metadata.namespace}/connections/${data.metadata.name}`
-      : `/apis/connection.gatekeeper.sh/v1alpha1/connections/${data.metadata.name}`;
+  const configRows = getConfigRows();
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
@@ -78,21 +75,20 @@ export default function ConnectionDetails() {
             {data.metadata.name}
           </Typography>
           <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-            External Data Connection
+            Violation Export Connection
           </Typography>
         </Box>
         <ResourceDeleteButton
-          name={data.metadata.name}
+          resource={item}
           kind="Connection"
-          apiUrl={apiUrl}
-          redirectUrl={RoutingPath.ExternalData}
+          redirectUrl={RoutingPath.ViolationExport}
         />
       </Box>
 
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -103,12 +99,12 @@ export default function ConnectionDetails() {
           </TableBody>
         </Table>
       </SectionBox>
-      
+
       {configRows.length > 0 && (
         <SectionBox title="Driver Configuration">
           <Table>
             <TableBody>
-              {configRows.map((row) => (
+              {configRows.map(row => (
                 <TableRow key={row.name}>
                   <TableCell component="th" scope="row">
                     {row.name}
@@ -120,37 +116,8 @@ export default function ConnectionDetails() {
           </Table>
         </SectionBox>
       )}
-      
-      
-      <SectionBox title="System Sync Status">
-        {(data.status?.errors && data.status.errors.length > 0) || (data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0)) ? (
-          <Box>
-            {data.status?.errors && data.status.errors.length > 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                <strong>Global Error:</strong> {JSON.stringify(data.status.errors)}
-              </Alert>
-            )}
-            {data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0) && (
-              <Alert severity="error">
-                <strong>Sync Error:</strong> Failed to load this rule in Gatekeeper.
-                <ul style={{ margin: 0, paddingLeft: '20px', marginTop: '8px' }}>
-                  {data.status.byPod.filter((p: any) => p.errors && p.errors.length > 0).map((p: any) => (
-                    <li key={p.id}>{p.id}: {JSON.stringify(p.errors)}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-          </Box>
-        ) : (data.status?.byPod?.length > 0 && data.status.byPod.every((p: any) => p.active === true)) ? (
-          <Alert severity="success">
-            Active and successfully synced.
-          </Alert>
-        ) : (
-          <Alert severity="info">
-            Inactive or pending.
-          </Alert>
-        )}
-      </SectionBox>
+
+      <GatekeeperResourceStatus resource={data} readinessField="active" />
     </Box>
   );
 }

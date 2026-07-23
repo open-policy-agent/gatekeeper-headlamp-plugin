@@ -4,10 +4,15 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Box, Chip, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
-import React, { useState, useMemo } from 'react';
+import { Box, Chip, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { SyncSetClass } from '../model';
+import { getSyncSetGVKs } from '../resourceData';
+
+const KIND_FILTER_LABEL_ID = 'sync-set-kind-filter-label';
+const KIND_FILTER_ID = 'sync-set-kind-filter';
 
 export default function SyncSetList(props: { hideTitle?: boolean }) {
   const [items, setItems] = useState<KubeObject[] | null>(null);
@@ -21,9 +26,8 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
     if (!items) return ['All'];
     const kinds = new Set<string>();
     items.forEach(item => {
-      const gvks = item.jsonData?.spec?.gvks || [];
-      gvks.forEach((s: any) => {
-         if (s.kind) kinds.add(s.kind);
+      getSyncSetGVKs(item).forEach(gvk => {
+        if (gvk.kind) kinds.add(gvk.kind);
       });
     });
     return ['All', ...Array.from(kinds).sort()];
@@ -32,19 +36,16 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
   const filteredItems = useMemo(() => {
     if (!items) return [];
     if (kindFilter === 'All') return items;
-    return items.filter(item => {
-      const gvks = item.jsonData?.spec?.gvks || [];
-      return gvks.some((s: any) => s.kind === kindFilter);
-    });
+    return items.filter(item => getSyncSetGVKs(item).some(gvk => gvk.kind === kindFilter));
   }, [items, kindFilter]);
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "SyncSet"}>
-        <Typography color="textSecondary">
-          Error loading SyncSet. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="SyncSet"
+        sectionTitle={props.hideTitle ? undefined : 'SyncSet'}
+      />
     );
   }
 
@@ -53,18 +54,21 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "SyncSet"}>
-      
+    <SectionBox title={props.hideTitle ? undefined : 'SyncSet'}>
       <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Synced Kind</InputLabel>
+          <InputLabel id={KIND_FILTER_LABEL_ID}>Filter by Synced Kind</InputLabel>
           <Select
+            id={KIND_FILTER_ID}
+            labelId={KIND_FILTER_LABEL_ID}
             value={kindFilter}
             label="Filter by Synced Kind"
-            onChange={(e) => setKindFilter(e.target.value as string)}
+            onChange={e => setKindFilter(e.target.value as string)}
           >
             {uniqueKinds.map(kind => (
-              <MenuItem key={kind} value={kind}>{kind}</MenuItem>
+              <MenuItem key={kind} value={kind}>
+                {kind}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -74,35 +78,32 @@ export default function SyncSetList(props: { hideTitle?: boolean }) {
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
-              <HeadlampLink
-                routeName={RoutingPath.SyncSet}
-                params={{ name: item.metadata.name }}
-              >
+            getter: item => (
+              <HeadlampLink routeName={RoutingPath.SyncSet} params={{ name: item.metadata.name }}>
                 {item.metadata.name}
               </HeadlampLink>
             ),
           },
           {
             label: 'GVKs Synced',
-            getter: (item) => {
-              const gvks = item.jsonData?.spec?.gvks;
-              if (Array.isArray(gvks)) {
-                 return (
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                      {gvks.map((gvk: any, i: number) => {
-                        const label = `${gvk.group || 'core'}/${gvk.version} ${gvk.kind}`;
-                        return <Chip key={i} label={label} size="small" variant="outlined" />;
-                      })}
-                    </Box>
-                 );
+            getter: item => {
+              const gvks = getSyncSetGVKs(item);
+              if (gvks.length > 0) {
+                return (
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {gvks.map((gvk, i) => {
+                      const label = `${gvk.group || 'core'}/${gvk.version} ${gvk.kind}`;
+                      return <Chip key={i} label={label} size="small" variant="outlined" />;
+                    })}
+                  </Box>
+                );
               }
               return '-';
             },
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

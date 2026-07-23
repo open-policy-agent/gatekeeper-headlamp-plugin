@@ -1,31 +1,27 @@
-import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import {
-  Alert,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography,
-  Chip
-} from '@mui/material';
-import React, { useState } from 'react';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { ConfigClass } from '../model';
+import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
+import {
+  ResourceDetailsError,
+  ResourceDetailsLoading,
+  useResourceDetails,
+} from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
+import { ConfigClass } from '../model';
 
 export default function ConfigDetails() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const [item, setItem] = useState<KubeObject | null>(null);
+  const { item, error } = useResourceDetails(ConfigClass, name, namespace || 'gatekeeper-system');
 
-  ConfigClass.useApiGet(setItem, name, namespace || 'gatekeeper-system');
+  if (error) {
+    return <ResourceDetailsError error={error} kind="Config" name={name} />;
+  }
 
   if (!item) {
-    return <Typography>Loading Config details...</Typography>;
+    return <ResourceDetailsLoading kind="Config" />;
   }
 
   const data = item.jsonData as any;
@@ -50,13 +46,19 @@ export default function ConfigDetails() {
       },
     ];
   }
-  
+
   function getSyncOnlyRows() {
     const syncOnly = data.spec?.sync?.syncOnly;
     if (!Array.isArray(syncOnly)) return [];
     return syncOnly.map((s: any, i: number) => ({
       name: `Sync Resource ${i + 1}`,
-      value: <Chip label={`${s.group || 'core'}/${s.version} ${s.kind}`} size="small" variant="outlined" />
+      value: (
+        <Chip
+          label={`${s.group || 'core'}/${s.version} ${s.kind}`}
+          size="small"
+          variant="outlined"
+        />
+      ),
     }));
   }
 
@@ -65,13 +67,9 @@ export default function ConfigDetails() {
     if (!Array.isArray(matches)) return [];
     return matches.map((m: any, i: number) => ({
       name: `Match Config ${i + 1}`,
-      value: JSON.stringify(m)
+      value: JSON.stringify(m),
     }));
   }
-
-  const apiUrl = data.metadata.namespace 
-      ? `/apis/config.gatekeeper.sh/v1alpha1/namespaces/${data.metadata.namespace}/configs/${data.metadata.name}`
-      : `/apis/config.gatekeeper.sh/v1alpha1/configs/${data.metadata.name}`;
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
@@ -84,18 +82,13 @@ export default function ConfigDetails() {
             Config
           </Typography>
         </Box>
-        <ResourceDeleteButton
-          name={data.metadata.name}
-          kind="Config"
-          apiUrl={apiUrl}
-          redirectUrl={RoutingPath.Configuration}
-        />
+        <ResourceDeleteButton resource={item} kind="Config" redirectUrl={RoutingPath.Configs} />
       </Box>
 
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -111,7 +104,7 @@ export default function ConfigDetails() {
         <SectionBox title="Sync Resources (syncOnly)">
           <Table>
             <TableBody>
-              {getSyncOnlyRows().map((row) => (
+              {getSyncOnlyRows().map(row => (
                 <TableRow key={row.name}>
                   <TableCell component="th" scope="row">
                     {row.name}
@@ -128,7 +121,7 @@ export default function ConfigDetails() {
         <SectionBox title="Match Configurations">
           <Table>
             <TableBody>
-              {getMatchRows().map((row) => (
+              {getMatchRows().map(row => (
                 <TableRow key={row.name}>
                   <TableCell component="th" scope="row">
                     {row.name}
@@ -140,36 +133,8 @@ export default function ConfigDetails() {
           </Table>
         </SectionBox>
       )}
-    
-      <SectionBox title="System Sync Status">
-        {(data.status?.errors && data.status.errors.length > 0) || (data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0)) ? (
-          <Box>
-            {data.status?.errors && data.status.errors.length > 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                <strong>Global Error:</strong> {JSON.stringify(data.status.errors)}
-              </Alert>
-            )}
-            {data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0) && (
-              <Alert severity="error">
-                <strong>Sync Error:</strong> Failed to load this rule in Gatekeeper.
-                <ul style={{ margin: 0, paddingLeft: '20px', marginTop: '8px' }}>
-                  {data.status.byPod.filter((p: any) => p.errors && p.errors.length > 0).map((p: any) => (
-                    <li key={p.id}>{p.id}: {JSON.stringify(p.errors)}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-          </Box>
-        ) : (data.status?.byPod?.length > 0) ? (
-          <Alert severity="success">
-            Active and successfully synced.
-          </Alert>
-        ) : (
-          <Alert severity="info">
-            Pending or unknown status.
-          </Alert>
-        )}
-      </SectionBox>
+
+      <GatekeeperResourceStatus resource={data} />
     </Box>
   );
 }

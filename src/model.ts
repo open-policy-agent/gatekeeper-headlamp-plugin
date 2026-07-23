@@ -2,7 +2,8 @@ import * as ApiProxyModuleFromLib from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import { makeCustomResourceClass } from '@kinvolk/headlamp-plugin/lib/lib/k8s/crd';
 import React from 'react';
 
-let effectiveRequestFunc: ((url: string, M?: any, O?: any, P?: any) => Promise<any>) | undefined = undefined;
+let effectiveRequestFunc: ((url: string, M?: any, O?: any, P?: any) => Promise<any>) | undefined =
+  undefined;
 
 if (ApiProxyModuleFromLib) {
   const moduleAsAny = ApiProxyModuleFromLib as any;
@@ -10,59 +11,113 @@ if (ApiProxyModuleFromLib) {
     effectiveRequestFunc = moduleAsAny.request;
   } else if (typeof moduleAsAny.default === 'function') {
     effectiveRequestFunc = moduleAsAny.default;
-  } else if (moduleAsAny.default && typeof moduleAsAny.default === 'object' && typeof moduleAsAny.default.request === 'function') {
+  } else if (
+    moduleAsAny.default &&
+    typeof moduleAsAny.default === 'object' &&
+    typeof moduleAsAny.default.request === 'function'
+  ) {
     effectiveRequestFunc = moduleAsAny.default.request;
   } else {
-    console.error('[model.ts] Top-level: Failed to assign effectiveRequestFunc. No suitable function found in ApiProxyModuleFromLib or its .default property.');
+    console.error(
+      '[model.ts] Top-level: Failed to assign effectiveRequestFunc. No suitable function found in ApiProxyModuleFromLib or its .default property.'
+    );
   }
 } else {
-  console.error('[model.ts] Top-level: ApiProxyModuleFromLib is null or undefined. Cannot assign effectiveRequestFunc.');
+  console.error(
+    '[model.ts] Top-level: ApiProxyModuleFromLib is null or undefined. Cannot assign effectiveRequestFunc.'
+  );
 }
 
-const apiGatekeeperTemplatesGroupVersionV1beta1 = [{ group: 'templates.gatekeeper.sh', version: 'v1beta1' }];
+const constraintTemplateApiVersions = ['v1', 'v1beta1'] as const;
+const apiGatekeeperTemplatesGroupVersion = constraintTemplateApiVersions.map(version => ({
+  group: 'templates.gatekeeper.sh',
+  version,
+}));
 
 export const ConstraintTemplateClass = makeCustomResourceClass({
-  apiInfo: apiGatekeeperTemplatesGroupVersionV1beta1,
+  apiInfo: apiGatekeeperTemplatesGroupVersion,
   isNamespaced: false,
   singularName: 'constrainttemplate',
   pluralName: 'constrainttemplates',
 });
 
+export async function requestConstraintTemplates(name?: string): Promise<any> {
+  if (typeof effectiveRequestFunc !== 'function') {
+    throw new Error('API request function not available for ConstraintTemplates.');
+  }
+
+  let lastNotFoundError: unknown;
+  for (const version of constraintTemplateApiVersions) {
+    const suffix = name ? `/${name}` : '';
+    try {
+      return await effectiveRequestFunc(
+        `/apis/templates.gatekeeper.sh/${version}/constrainttemplates${suffix}`
+      );
+    } catch (error: any) {
+      if (error?.status === 404) {
+        lastNotFoundError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastNotFoundError ?? new Error('No supported ConstraintTemplate API version is available.');
+}
+
 // Utility function to discover constraint types from ConstraintTemplates
 async function discoverConstraintTypes(): Promise<string[]> {
   if (typeof effectiveRequestFunc !== 'function') {
-    console.error('[model.ts] discoverConstraintTypes: effectiveRequestFunc is NOT a function. Cannot make API call.');
+    console.error(
+      '[model.ts] discoverConstraintTypes: effectiveRequestFunc is NOT a function. Cannot make API call.'
+    );
     return [];
   }
 
   try {
-    const templatesResponse = await effectiveRequestFunc('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+    const templatesResponse = await requestConstraintTemplates();
 
     if (templatesResponse && templatesResponse.items && Array.isArray(templatesResponse.items)) {
-      const constraintTypes = templatesResponse.items.map((template: any, index: number) => {
-        if (!template || !template.spec || !template.spec.crd || !template.spec.crd.spec || !template.spec.crd.spec.names) {
-          console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] has unexpected structure. Skipping.`);
+      const constraintTypes = templatesResponse.items
+        .map((template: any, index: number) => {
+          if (
+            !template ||
+            !template.spec ||
+            !template.spec.crd ||
+            !template.spec.crd.spec ||
+            !template.spec.crd.spec.names
+          ) {
+            console.warn(
+              `[model.ts] discoverConstraintTypes: Template item [${index}] has unexpected structure. Skipping.`
+            );
+            return null;
+          }
+
+          const kind = template.spec.crd.spec.names.kind;
+          const plural = template.spec.crd.spec.names.plural;
+
+          if (plural) {
+            return plural.toLowerCase();
+          } else if (kind) {
+            console.warn(
+              `[model.ts] discoverConstraintTypes: Template item [${index}] missing plural name, falling back to kind: ${kind}`
+            );
+            return kind.toLowerCase();
+          }
           return null;
-        }
-
-        const kind = template.spec.crd.spec.names.kind;
-        const plural = template.spec.crd.spec.names.plural;
-
-        if (plural) {
-          return plural.toLowerCase();
-        } else if (kind) {
-          console.warn(`[model.ts] discoverConstraintTypes: Template item [${index}] missing plural name, falling back to kind: ${kind}`);
-          return kind.toLowerCase();
-        }
-        return null;
-      }).filter(Boolean);
+        })
+        .filter(Boolean);
 
       return constraintTypes as string[];
     }
 
     return [];
   } catch (error: any) {
-    console.error('[model.ts] discoverConstraintTypes: Error during discovery process:', error.message, error);
+    console.error(
+      '[model.ts] discoverConstraintTypes: Error during discovery process:',
+      error.message,
+      error
+    );
     return [];
   }
 }
@@ -70,7 +125,9 @@ async function discoverConstraintTypes(): Promise<string[]> {
 // Function to fetch constraints for a specific type
 async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
   if (typeof effectiveRequestFunc !== 'function') {
-    console.error(`[model.ts] fetchConstraintsOfType: effectiveRequestFunc is NOT a function for type ${constraintType}.`);
+    console.error(
+      `[model.ts] fetchConstraintsOfType: effectiveRequestFunc is NOT a function for type ${constraintType}.`
+    );
     return [];
   }
 
@@ -85,8 +142,6 @@ async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
   }
 }
 
-let constraintTypesPromise: Promise<string[]> | null = null;
-
 // Dynamic constraint class that discovers types at runtime
 export const ConstraintClass = {
   useApiList: (setData: (data: any) => void) => {
@@ -97,7 +152,6 @@ export const ConstraintClass = {
 
     React.useEffect(() => {
       const performDiscovery = async () => {
-        constraintTypesPromise = null;
         setLoading(true);
         setError(null);
 
@@ -151,13 +205,16 @@ export const ConstraintClass = {
               allData.push(...constraints);
             }
           } catch (e: any) {
-            console.error(`[model.ts] useApiList: Failed to fetch constraints for type ${type}:`, e);
+            console.error(
+              `[model.ts] useApiList: Failed to fetch constraints for type ${type}:`,
+              e
+            );
             fetchErrorOccurred = true;
           }
         }
 
         if (fetchErrorOccurred) {
-          console.warn("[model.ts] useApiList: One or more constraint types failed to fetch.");
+          console.warn('[model.ts] useApiList: One or more constraint types failed to fetch.');
         }
         setAllConstraints(allData);
       };
@@ -236,7 +293,9 @@ export const ConstraintClass = {
               foundConstraint = response;
             }
           } catch (e: any) {
-            console.warn(`[model.ts] useApiGet: Constraint "${name}" not found in specified type "${constraintType}".`);
+            console.warn(
+              `[model.ts] useApiGet: Constraint "${name}" not found in specified type "${constraintType}".`
+            );
           }
         }
 
@@ -339,7 +398,10 @@ export const ProviderClass = makeCustomResourceClass({
 });
 
 export const ConnectionClass = makeCustomResourceClass({
-  apiInfo: [{ group: 'connection.gatekeeper.sh', version: 'v1alpha1' }, { group: 'connection.gatekeeper.sh', version: 'v1beta1' }],
+  apiInfo: [
+    { group: 'connection.gatekeeper.sh', version: 'v1alpha1' },
+    { group: 'connection.gatekeeper.sh', version: 'v1beta1' },
+  ],
   isNamespaced: true,
   singularName: 'Connection',
   pluralName: 'connections',
@@ -347,11 +409,11 @@ export const ConnectionClass = makeCustomResourceClass({
 
 // --- Expansion Models ---
 export const ExpansionTemplateClass = makeCustomResourceClass({
-  apiInfo: [{ group: 'expansion.gatekeeper.sh', version: 'v1alpha1' }, { group: 'expansion.gatekeeper.sh', version: 'v1beta1' }],
+  apiInfo: [
+    { group: 'expansion.gatekeeper.sh', version: 'v1alpha1' },
+    { group: 'expansion.gatekeeper.sh', version: 'v1beta1' },
+  ],
   isNamespaced: false,
   singularName: 'ExpansionTemplate',
   pluralName: 'expansiontemplate',
 });
-
-
-

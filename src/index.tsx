@@ -1,39 +1,37 @@
-import {
-  registerRoute,
-  registerSidebarEntry,
-} from '@kinvolk/headlamp-plugin/lib';
+import { registerRoute, registerSidebarEntry } from '@kinvolk/headlamp-plugin/lib';
+import ConfigDetails from './configuration/ConfigDetails';
+import ConfigurationPage from './configuration/ConfigurationPage';
+import SyncSetDetails from './configuration/SyncSetDetails';
 import ConstraintDetails from './constraint/Details';
 import ConstraintTemplateDetails from './constraint-template/Details';
-import ViolationsDetails from './violations/Details';
-
-import AssignDetails from './mutation/AssignDetails';
-import AssignMetadataDetails from './mutation/AssignMetadataDetails';
-import AssignImageDetails from './mutation/AssignImageDetails';
-import ModifySetDetails from './mutation/ModifySetDetails';
-import ConfigDetails from './configuration/ConfigDetails';
-import SyncSetDetails from './configuration/SyncSetDetails';
-import ProviderDetails from './externaldata/ProviderDetails';
-import ConnectionDetails from './externaldata/ConnectionDetails';
-import ExpansionTemplateList from './expansion/ExpansionTemplateList';
+import ConstraintsPage from './constraints/ConstraintsPage';
 import ExpansionTemplateDetails from './expansion/ExpansionTemplateDetails';
-
+import ExpansionTemplateList from './expansion/ExpansionTemplateList';
+import ConnectionDetails from './externaldata/ConnectionDetails';
+import ExternalDataPage from './externaldata/ExternalDataPage';
+import ProviderDetails from './externaldata/ProviderDetails';
+import ViolationExportPage from './externaldata/ViolationExportPage';
 import LibraryList from './library/List';
 import LibraryTemplateDetails from './library/TemplateDetails';
-
-import ConstraintsPage from './constraints/ConstraintsPage';
+import AssignDetails from './mutation/AssignDetails';
+import AssignImageDetails from './mutation/AssignImageDetails';
+import AssignMetadataDetails from './mutation/AssignMetadataDetails';
+import ModifySetDetails from './mutation/ModifySetDetails';
 import MutationsPage from './mutation/MutationsPage';
-import ConfigurationPage from './configuration/ConfigurationPage';
-import ExternalDataPage from './externaldata/ExternalDataPage';
+import ViolationsDetails from './violations/Details';
 
 export namespace RoutingPath {
   // Library
   export const Library = '/gatekeeper/library';
-  export const LibraryTemplate = '/gatekeeper/library/:id';
+  export const LibraryTemplate = '/gatekeeper/library/:category/:name';
+  export const LegacyLibraryTemplate = '/gatekeeper/library/template/:id';
 
   // Policies / Constraints
+  export const ConstraintTemplates = '/gatekeeper/constraint-templates';
   export const ConstraintTemplate = '/gatekeeper/constraint-templates/:name';
   export const Constraints = '/gatekeeper/constraints';
   export const Constraint = '/gatekeeper/constraints/:kind/:name';
+  export const Violations = '/gatekeeper/violations';
   export const Violation = '/gatekeeper/violations/:kind/:name';
 
   // Mutations
@@ -58,8 +56,12 @@ export namespace RoutingPath {
   export const ExternalData = '/gatekeeper/externaldata';
   export const Providers = '/gatekeeper/externaldata/providers';
   export const Provider = '/gatekeeper/externaldata/providers/:name';
+
+  // Violation export (connection.gatekeeper.sh)
+  export const ViolationExport = '/gatekeeper/violation-export';
+  export const Connection = '/gatekeeper/violation-export/:namespace/:name';
   export const Connections = '/gatekeeper/externaldata/connections';
-  export const Connection = '/gatekeeper/externaldata/connections/:namespace/:name';
+  export const LegacyConnection = '/gatekeeper/externaldata/connections/:namespace/:name';
 
   // Expansion
   export const ExpansionTemplates = '/gatekeeper/expansion/expansiontemplates';
@@ -105,6 +107,13 @@ registerSidebarEntry({
 
 registerSidebarEntry({
   parent: 'gatekeeper',
+  name: 'gatekeeper-violation-export',
+  label: 'Violation Export',
+  url: RoutingPath.ViolationExport,
+});
+
+registerSidebarEntry({
+  parent: 'gatekeeper',
   name: 'gatekeeper-expansion',
   label: 'Expansion Templates',
   url: RoutingPath.ExpansionTemplates,
@@ -117,7 +126,7 @@ registerSidebarEntry({
   url: RoutingPath.Library,
 });
 
-// Register routes for main Tab Pages
+// Register routes for main and tab list pages
 registerRoute({
   path: RoutingPath.Library,
   sidebar: 'gatekeeper-library',
@@ -135,9 +144,57 @@ registerRoute({
 });
 
 registerRoute({
+  path: RoutingPath.ConstraintTemplates,
+  sidebar: 'gatekeeper-constraints',
+  name: 'Constraint Templates',
+  exact: true,
+  component: () => <ConstraintsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Violations,
+  sidebar: 'gatekeeper-constraints',
+  name: 'Violations',
+  exact: true,
+  component: () => <ConstraintsPage />,
+});
+
+registerRoute({
   path: RoutingPath.Mutations,
   sidebar: 'gatekeeper-mutations',
   name: 'Mutations',
+  exact: true,
+  component: () => <MutationsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Assigns,
+  sidebar: 'gatekeeper-mutations',
+  name: 'Assign Mutations',
+  exact: true,
+  component: () => <MutationsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.AssignMetadatas,
+  sidebar: 'gatekeeper-mutations',
+  name: 'AssignMetadata Mutations',
+  exact: true,
+  component: () => <MutationsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.AssignImages,
+  sidebar: 'gatekeeper-mutations',
+  name: 'AssignImage Mutations',
+  exact: true,
+  component: () => <MutationsPage />,
+});
+
+registerRoute({
+  path: RoutingPath.ModifySets,
+  sidebar: 'gatekeeper-mutations',
+  name: 'ModifySet Mutations',
   exact: true,
   component: () => <MutationsPage />,
 });
@@ -151,11 +208,51 @@ registerRoute({
 });
 
 registerRoute({
+  path: RoutingPath.Configs,
+  sidebar: 'gatekeeper-configuration',
+  name: 'Gatekeeper Configs',
+  exact: true,
+  component: () => <ConfigurationPage />,
+});
+
+registerRoute({
+  path: RoutingPath.SyncSets,
+  sidebar: 'gatekeeper-configuration',
+  name: 'Gatekeeper SyncSets',
+  exact: true,
+  component: () => <ConfigurationPage />,
+});
+
+registerRoute({
   path: RoutingPath.ExternalData,
   sidebar: 'gatekeeper-externaldata',
   name: 'External Data',
   exact: true,
   component: () => <ExternalDataPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Providers,
+  sidebar: 'gatekeeper-externaldata',
+  name: 'External Data Providers',
+  exact: true,
+  component: () => <ExternalDataPage />,
+});
+
+registerRoute({
+  path: RoutingPath.ViolationExport,
+  sidebar: 'gatekeeper-violation-export',
+  name: 'Violation Export',
+  exact: true,
+  component: () => <ViolationExportPage />,
+});
+
+registerRoute({
+  path: RoutingPath.Connections,
+  sidebar: 'gatekeeper-violation-export',
+  name: 'Violation Export (Legacy URL)',
+  exact: true,
+  component: () => <ViolationExportPage />,
 });
 
 registerRoute({
@@ -167,6 +264,15 @@ registerRoute({
 });
 
 // --- Details Pages Routes ---
+// Register the legacy two-segment route first because it also matches the canonical pattern.
+registerRoute({
+  path: RoutingPath.LegacyLibraryTemplate,
+  name: 'Library Template Details (Legacy URL)',
+  exact: true,
+  sidebar: 'gatekeeper-library',
+  component: () => <LibraryTemplateDetails />,
+});
+
 registerRoute({
   path: RoutingPath.LibraryTemplate,
   name: 'Library Template Details',
@@ -257,8 +363,16 @@ registerRoute({
 
 registerRoute({
   path: RoutingPath.Connection,
-  sidebar: 'gatekeeper-externaldata',
-  name: 'Connection Details',
+  sidebar: 'gatekeeper-violation-export',
+  name: 'Violation Export Connection Details',
+  exact: true,
+  component: () => <ConnectionDetails />,
+});
+
+registerRoute({
+  path: RoutingPath.LegacyConnection,
+  sidebar: 'gatekeeper-violation-export',
+  name: 'Violation Export Connection Details (Legacy URL)',
   exact: true,
   component: () => <ConnectionDetails />,
 });

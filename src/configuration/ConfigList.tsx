@@ -4,8 +4,9 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Chip, Box } from '@mui/material';
+import { Box, Chip, Typography } from '@mui/material';
 import React, { useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { ConfigClass } from '../model';
 
@@ -17,11 +18,11 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Config"}>
-        <Typography color="textSecondary">
-          Error loading Config. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="Config"
+        sectionTitle={props.hideTitle ? undefined : 'Config'}
+      />
     );
   }
 
@@ -30,13 +31,13 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Config"}>
+    <SectionBox title={props.hideTitle ? undefined : 'Config'}>
       <SimpleTable
         data={items}
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
+            getter: item => (
               <HeadlampLink
                 routeName={RoutingPath.Config}
                 params={{ namespace: item.metadata.namespace || '-', name: item.metadata.name }}
@@ -47,16 +48,20 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Namespace',
-            getter: (item) => item.metadata.namespace || '-',
+            getter: item => item.metadata.namespace || '-',
           },
           {
             label: 'Sync Resources Configured',
-            getter: (item) => {
+            getter: item => {
               const syncOnly = item.jsonData?.spec?.sync?.syncOnly;
               if (Array.isArray(syncOnly)) {
                 return (
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                     <Chip label={`${syncOnly.length} resource types`} size="small" variant="outlined" />
+                    <Chip
+                      label={`${syncOnly.length} resource types`}
+                      size="small"
+                      variant="outlined"
+                    />
                   </Box>
                 );
               }
@@ -65,7 +70,7 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Matches Configured',
-            getter: (item) => {
+            getter: item => {
               const match = item.jsonData?.spec?.match;
               if (Array.isArray(match)) {
                 return match.length.toString();
@@ -75,7 +80,7 @@ export default function ConfigList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

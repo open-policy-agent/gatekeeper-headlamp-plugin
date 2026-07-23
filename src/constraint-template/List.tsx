@@ -5,25 +5,26 @@ import {
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import {
-  Typography,
-  Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  SelectChangeEvent,
-  Button,
   Alert,
   AlertTitle,
+  Box,
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Typography,
 } from '@mui/material';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { RoutingPath } from '../index';
-import { ConstraintTemplateClass } from '../model';
+import { ConstraintTemplateClass, requestConstraintTemplates } from '../model';
 import { ConstraintTemplate } from '../types';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 
-interface ConstraintTemplateListProps { hideTitle?: boolean; }
+interface ConstraintTemplateListProps {
+  hideTitle?: boolean;
+}
 
 function ConstraintTemplateList(props: ConstraintTemplateListProps) {
   const [constraintTemplates, setConstraintTemplates] = useState<KubeObject[] | null>(null);
@@ -38,29 +39,15 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
   useEffect(() => {
     const checkGatekeeperCRD = async () => {
       try {
-        // Get the request function from ApiProxy
-        const apiProxyModule = ApiProxy as any;
-        let requestFunc: ((url: string) => Promise<any>) | undefined;
-
-        if (typeof apiProxyModule.request === 'function') {
-          requestFunc = apiProxyModule.request;
-        } else if (typeof apiProxyModule.default === 'function') {
-          requestFunc = apiProxyModule.default;
-        } else if (apiProxyModule.default && typeof apiProxyModule.default.request === 'function') {
-          requestFunc = apiProxyModule.default.request;
-        }
-
-        if (!requestFunc) {
-          console.error('[ConstraintTemplateList] Could not find API request function');
-          return;
-        }
-
-        // Try to fetch constraint templates - if this fails, Gatekeeper is likely not installed
-        await requestFunc('/apis/templates.gatekeeper.sh/v1beta1/constrainttemplates');
+        await requestConstraintTemplates();
       } catch (error: any) {
         // Check if it's a 404 or connection error indicating CRD doesn't exist
-        if (error?.status === 404 || error?.message?.includes('404') ||
-            error?.message?.includes('not found') || error?.message?.includes('no matches')) {
+        if (
+          error?.status === 404 ||
+          error?.message?.includes('404') ||
+          error?.message?.includes('not found') ||
+          error?.message?.includes('no matches')
+        ) {
           console.log('[ConstraintTemplateList] Gatekeeper CRDs not found');
           setGatekeeperNotInstalled(true);
         }
@@ -102,18 +89,14 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
     };
 
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Constraint Templates"}>
+      <SectionBox title={props.hideTitle ? undefined : 'Constraint Templates'}>
         <Alert severity="warning" sx={{ margin: 2 }}>
           <AlertTitle>Gatekeeper Not Found</AlertTitle>
           <Typography variant="body2" sx={{ marginBottom: 2 }}>
-            Gatekeeper does not appear to be installed in your cluster.
-            Install Gatekeeper to start using policy enforcement and constraint templates.
+            Gatekeeper does not appear to be installed in your cluster. Install Gatekeeper to start
+            using policy enforcement and constraint templates.
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleInstallGatekeeper}
-          >
+          <Button variant="contained" color="primary" onClick={handleInstallGatekeeper}>
             Install Gatekeeper
           </Button>
         </Alert>
@@ -146,7 +129,7 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Constraint Templates"}>
+    <SectionBox title={props.hideTitle ? undefined : 'Constraint Templates'}>
       <Box sx={{ marginBottom: 2, maxWidth: 300 }}>
         <FormControl fullWidth size="small">
           <InputLabel id="target-filter-label">Filter by Target</InputLabel>
@@ -172,40 +155,40 @@ function ConstraintTemplateList(props: ConstraintTemplateListProps) {
       ) : templates.length === 0 && constraintTemplates.length === 0 ? (
         <Typography sx={{ padding: 2 }}>No constraint templates found.</Typography>
       ) : (
-            <SimpleTable
-              data={templates}
-              columns={[
-                {
-                  label: 'Name',
-                  getter: (template: any) => (
-                    <HeadlampLink
-                      routeName={RoutingPath.ConstraintTemplate}
-                      params={{
-                        name: template.metadata.name,
-                      }}
-                    >
-                      {template.metadata.name}
-                    </HeadlampLink>
-                  ),
-                },
-                {
-                  label: 'Kind',
-                  getter: (template: any) => template.spec?.crd?.spec?.names?.kind || '',
-                },
-                {
-                  label: 'Targets',
-                  getter: (template: any) => getTargets(template),
-                },
-                {
-                  label: 'Status',
-                  getter: (template: any) => makeStatusLabel(template),
-                },
-                {
-                  label: 'Age',
-                  getter: (template: any) => template.metadata.creationTimestamp,
-                },
-              ]}
-            />
+        <SimpleTable
+          data={templates}
+          columns={[
+            {
+              label: 'Name',
+              getter: (template: any) => (
+                <HeadlampLink
+                  routeName={RoutingPath.ConstraintTemplate}
+                  params={{
+                    name: template.metadata.name,
+                  }}
+                >
+                  {template.metadata.name}
+                </HeadlampLink>
+              ),
+            },
+            {
+              label: 'Kind',
+              getter: (template: any) => template.spec?.crd?.spec?.names?.kind || '',
+            },
+            {
+              label: 'Targets',
+              getter: (template: any) => getTargets(template),
+            },
+            {
+              label: 'Status',
+              getter: (template: any) => makeStatusLabel(template),
+            },
+            {
+              label: 'Age',
+              getter: (template: any) => template.metadata.creationTimestamp,
+            },
+          ]}
+        />
       )}
     </SectionBox>
   );

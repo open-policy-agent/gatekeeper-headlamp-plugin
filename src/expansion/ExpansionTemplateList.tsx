@@ -4,8 +4,9 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Box, FormControl, InputLabel, Select, MenuItem, Chip } from '@mui/material';
-import React, { useState, useMemo } from 'react';
+import { Box, Chip, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { ExpansionTemplateClass } from '../model';
 
@@ -61,11 +62,11 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Expansion Templates"}>
-        <Typography color="textSecondary">
-          Error loading Expansion Template. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="Expansion Templates"
+        sectionTitle={props.hideTitle ? undefined : 'Expansion Templates'}
+      />
     );
   }
 
@@ -74,7 +75,7 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Expansion Templates"}>
+    <SectionBox title={props.hideTitle ? undefined : 'Expansion Templates'}>
       <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 200 }} size="small">
           <InputLabel id="kind-filter-label">Target Kind</InputLabel>
@@ -82,9 +83,9 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
             labelId="kind-filter-label"
             value={kindFilter}
             label="Target Kind"
-            onChange={(e) => setKindFilter(e.target.value as string)}
+            onChange={e => setKindFilter(e.target.value as string)}
           >
-            {uniqueKinds.map((k) => (
+            {uniqueKinds.map(k => (
               <MenuItem key={k} value={k}>
                 {k}
               </MenuItem>
@@ -98,9 +99,9 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
             labelId="generated-kind-filter-label"
             value={generatedKindFilter}
             label="Generated Kind"
-            onChange={(e) => setGeneratedKindFilter(e.target.value as string)}
+            onChange={e => setGeneratedKindFilter(e.target.value as string)}
           >
-            {uniqueGeneratedKinds.map((k) => (
+            {uniqueGeneratedKinds.map(k => (
               <MenuItem key={k} value={k}>
                 {k}
               </MenuItem>
@@ -114,7 +115,7 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
+            getter: item => (
               <HeadlampLink
                 routeName={RoutingPath.ExpansionTemplate}
                 params={{ name: item.metadata.name }}
@@ -125,19 +126,21 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Target Kinds (applyTo)',
-            getter: (item) => {
+            getter: item => {
               const kinds = getTargetKinds(item);
               if (kinds.length === 0) return '-';
               return (
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {kinds.map(k => <Chip key={k} label={k} size="small" variant="outlined" />)}
+                  {kinds.map(k => (
+                    <Chip key={k} label={k} size="small" variant="outlined" />
+                  ))}
                 </Box>
               );
             },
           },
           {
             label: 'Generated GVK',
-            getter: (item) => {
+            getter: item => {
               const gvk = item.jsonData?.spec?.generatedGVK;
               if (gvk) {
                 const label = `${gvk.group || 'core'}/${gvk.version} ${gvk.kind}`;
@@ -148,11 +151,11 @@ export default function ExpansionTemplateList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Source',
-            getter: (item) => item.jsonData?.spec?.templateSource || '-',
+            getter: item => item.jsonData?.spec?.templateSource || '-',
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

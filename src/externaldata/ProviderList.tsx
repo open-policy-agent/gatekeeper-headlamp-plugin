@@ -4,8 +4,9 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Box, Chip } from '@mui/material';
+import { Chip, Typography } from '@mui/material';
 import React, { useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { ProviderClass } from '../model';
 
@@ -17,11 +18,11 @@ export default function ProviderList(props: { hideTitle?: boolean }) {
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Provider"}>
-        <Typography color="textSecondary">
-          Error loading Provider. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="Provider"
+        sectionTitle={props.hideTitle ? undefined : 'Provider'}
+      />
     );
   }
 
@@ -30,35 +31,32 @@ export default function ProviderList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Provider"}>
+    <SectionBox title={props.hideTitle ? undefined : 'Provider'}>
       <SimpleTable
         data={items}
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
-              <HeadlampLink
-                routeName={RoutingPath.Provider}
-                params={{ name: item.metadata.name }}
-              >
+            getter: item => (
+              <HeadlampLink routeName={RoutingPath.Provider} params={{ name: item.metadata.name }}>
                 {item.metadata.name}
               </HeadlampLink>
             ),
           },
           {
             label: 'URL',
-            getter: (item) => item.jsonData?.spec?.url || '-',
+            getter: item => item.jsonData?.spec?.url || '-',
           },
           {
             label: 'Timeout',
-            getter: (item) => {
+            getter: item => {
               const timeout = item.jsonData?.spec?.timeout;
               return timeout ? <Chip label={`${timeout}s`} size="small" variant="outlined" /> : '-';
             },
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

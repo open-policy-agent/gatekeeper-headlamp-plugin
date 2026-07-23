@@ -1,92 +1,99 @@
+import type { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import {
+  Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
   Snackbar,
-  Alert,
-  CircularProgress
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useHistory, useLocation } from 'react-router-dom';
-import * as ApiProxy from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { useHistory } from 'react-router-dom';
 
 interface ResourceDeleteButtonProps {
-  name: string;
+  resource: KubeObject;
   kind: string;
-  apiUrl: string;
   redirectUrl: string;
 }
 
-export default function ResourceDeleteButton({ name, kind, apiUrl, redirectUrl }: ResourceDeleteButtonProps) {
+interface ComparableLocation {
+  key?: string;
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
+export function isSameHistoryLocation(
+  currentLocation: ComparableLocation,
+  originalLocation: ComparableLocation
+): boolean {
+  return (
+    currentLocation.key === originalLocation.key &&
+    currentLocation.pathname === originalLocation.pathname &&
+    currentLocation.search === originalLocation.search &&
+    currentLocation.hash === originalLocation.hash
+  );
+}
+
+export function buildClusterRedirectPath(pathname: string, redirectUrl: string): string {
+  const clusterMatch = pathname.match(/^\/c\/([^/]+)/);
+  return clusterMatch ? `/c/${clusterMatch[1]}${redirectUrl}` : redirectUrl;
+}
+
+function getDeleteErrorMessage(error: unknown, kind: string): string {
+  let detail = '';
+
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: unknown; json?: { message?: unknown } };
+    const rawDetail = candidate.json?.message || candidate.message;
+    detail = typeof rawDetail === 'string' ? rawDetail : '';
+  } else if (typeof error === 'string') {
+    detail = error;
+  }
+
+  return detail ? `Failed to delete ${kind}: ${detail}` : `Failed to delete ${kind}`;
+}
+
+export default function ResourceDeleteButton({
+  resource,
+  kind,
+  redirectUrl,
+}: ResourceDeleteButtonProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [snackbarState, setSnackbarState] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info',
-  });
-  
+  const [errorMessage, setErrorMessage] = useState('');
   const history = useHistory();
-  const location = useLocation();
-
-  const handleDeleteClick = () => {
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-  };
+  const name = resource.getName();
 
   const handleDeleteConfirm = async () => {
+    const deleteLocation = history.location;
+
     setIsDeleting(true);
     setDeleteDialogOpen(false);
+    setErrorMessage('');
 
     try {
-      await ApiProxy.request(apiUrl, { method: 'DELETE' });
+      await resource.delete();
 
-      setSnackbarState({
-        open: true,
-        message: `${kind} "${name}" deleted successfully`,
-        severity: 'success',
-      });
-
-      setTimeout(() => {
-        const clusterMatch = location.pathname.match(/\/c\/([^\/]+)/);
-        const cluster = clusterMatch ? clusterMatch[1] : null;
-        if (cluster) {
-          history.push(`/c/${cluster}${redirectUrl}`);
-        } else {
-          history.push(redirectUrl);
-        }
-      }, 1500);
-
-    } catch (error: any) {
-      let errorMessage = `Failed to delete ${kind}`;
-      if (error.json && error.json.message) {
-        errorMessage = `Failed to delete ${kind}: ${error.json.message}`;
-      } else if (error.message) {
-        errorMessage = `Failed to delete ${kind}: ${error.message}`;
+      const currentLocation = history.location;
+      if (isSameHistoryLocation(currentLocation, deleteLocation)) {
+        history.replace(buildClusterRedirectPath(deleteLocation.pathname, redirectUrl));
+      } else {
+        setIsDeleting(false);
       }
-
-      setSnackbarState({
-        open: true,
-        message: errorMessage,
-        severity: 'error',
-      });
+    } catch (error) {
+      setErrorMessage(getDeleteErrorMessage(error, kind));
       setIsDeleting(false);
     }
   };
 
-  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
-    if (reason === 'clickaway') return;
-    setSnackbarState(prev => ({ ...prev, open: false }));
+  const handleCloseSnackbar = (_event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason !== 'clickaway') {
+      setErrorMessage('');
+    }
   };
 
   return (
@@ -94,7 +101,7 @@ export default function ResourceDeleteButton({ name, kind, apiUrl, redirectUrl }
       <Button
         variant="contained"
         color="error"
-        onClick={handleDeleteClick}
+        onClick={() => setDeleteDialogOpen(true)}
         disabled={isDeleting}
         startIcon={isDeleting ? <CircularProgress size={20} /> : null}
         sx={{ height: 'fit-content' }}
@@ -102,28 +109,31 @@ export default function ResourceDeleteButton({ name, kind, apiUrl, redirectUrl }
         {isDeleting ? 'Deleting...' : 'Delete'}
       </Button>
 
-      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Delete {kind}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the {kind} "{name}"?
-            This action cannot be undone.
+            Are you sure you want to delete the {kind} "{name}"? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel} color="primary">Cancel</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">Delete</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
 
       <Snackbar
-        open={snackbarState.open}
+        open={Boolean(errorMessage)}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarState.severity} sx={{ width: '100%' }}>
-          {snackbarState.message}
+        <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
+          {errorMessage}
         </Alert>
       </Snackbar>
     </>

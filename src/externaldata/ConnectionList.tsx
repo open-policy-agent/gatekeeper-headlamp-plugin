@@ -4,10 +4,15 @@ import {
   SimpleTable,
 } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import { Typography, Box, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
-import React, { useState, useMemo } from 'react';
+import { Box, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import ResourceListError from '../components/ResourceListError';
 import { RoutingPath } from '../index';
 import { ConnectionClass } from '../model';
+import { getConnectionDriver } from '../resourceData';
+
+const DRIVER_FILTER_LABEL_ID = 'connection-driver-filter-label';
+const DRIVER_FILTER_ID = 'connection-driver-filter';
 
 export default function ConnectionList(props: { hideTitle?: boolean }) {
   const [items, setItems] = useState<KubeObject[] | null>(null);
@@ -21,9 +26,8 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
     if (!items) return ['All'];
     const drivers = new Set<string>();
     items.forEach(item => {
-      if (item.jsonData?.spec?.driver) {
-        drivers.add(item.jsonData?.spec?.driver);
-      }
+      const driver = getConnectionDriver(item);
+      if (driver) drivers.add(driver);
     });
     return ['All', ...Array.from(drivers).sort()];
   }, [items]);
@@ -31,16 +35,16 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
   const filteredItems = useMemo(() => {
     if (!items) return [];
     if (driverFilter === 'All') return items;
-    return items.filter(item => item.jsonData?.spec?.driver === driverFilter);
+    return items.filter(item => getConnectionDriver(item) === driverFilter);
   }, [items, driverFilter]);
 
   if (error) {
     return (
-      <SectionBox title={props.hideTitle ? undefined : "Connection"}>
-        <Typography color="textSecondary">
-          Error loading Connection. The CustomResourceDefinition may not be installed.
-        </Typography>
-      </SectionBox>
+      <ResourceListError
+        error={error}
+        resourceName="Connection"
+        sectionTitle={props.hideTitle ? undefined : 'Connection'}
+      />
     );
   }
 
@@ -49,18 +53,21 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
   }
 
   return (
-    <SectionBox title={props.hideTitle ? undefined : "Connection"}>
-      
+    <SectionBox title={props.hideTitle ? undefined : 'Connection'}>
       <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Driver</InputLabel>
+          <InputLabel id={DRIVER_FILTER_LABEL_ID}>Filter by Driver</InputLabel>
           <Select
+            id={DRIVER_FILTER_ID}
+            labelId={DRIVER_FILTER_LABEL_ID}
             value={driverFilter}
             label="Filter by Driver"
-            onChange={(e) => setDriverFilter(e.target.value as string)}
+            onChange={e => setDriverFilter(e.target.value as string)}
           >
             {uniqueDrivers.map(driver => (
-              <MenuItem key={driver} value={driver}>{driver}</MenuItem>
+              <MenuItem key={driver} value={driver}>
+                {driver}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -70,7 +77,7 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
         columns={[
           {
             label: 'Name',
-            getter: (item) => (
+            getter: item => (
               <HeadlampLink
                 routeName={RoutingPath.Connection}
                 params={{ namespace: item.metadata.namespace || '-', name: item.metadata.name }}
@@ -81,15 +88,11 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
           },
           {
             label: 'Namespace',
-            getter: (item) => item.metadata.namespace || '-',
-          },
-          {
-            label: 'Driver',
-            getter: (item) => item.jsonData?.spec?.driver || '-',
+            getter: item => item.metadata.namespace || '-',
           },
           {
             label: 'Age',
-            getter: (item) => item.metadata.creationTimestamp,
+            getter: item => item.metadata.creationTimestamp,
           },
         ]}
       />

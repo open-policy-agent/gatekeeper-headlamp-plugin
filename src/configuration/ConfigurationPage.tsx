@@ -1,48 +1,80 @@
 import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { Tabs, Tab, Box } from '@mui/material';
-import React, { useState } from 'react';
+import { Box, Tab, Tabs } from '@mui/material';
+import React from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import ConfigList from './ConfigList';
 import SyncSetList from './SyncSetList';
 
-function a11yProps(index: number) {
+const tabIdPrefix = 'gatekeeper-configuration';
+const tabRoutes = [
+  {
+    path: '/gatekeeper/configuration/configs',
+    aliases: ['/gatekeeper/configuration'],
+  },
+  {
+    path: '/gatekeeper/configuration/syncsets',
+    aliases: [],
+  },
+] as const;
+
+interface TabPanelProps {
+  children: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function normalizePathname(pathname: string) {
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
+function matchesRoute(pathname: string, route: string) {
+  return normalizePathname(pathname).endsWith(route);
+}
+
+function routeWithCurrentPrefix(pathname: string, route: string) {
+  const routeStart = pathname.lastIndexOf('/gatekeeper/');
+  const prefix = routeStart === -1 ? '' : pathname.slice(0, routeStart);
+  return `${prefix}${route}`;
+}
+
+function tabA11yProps(index: number) {
   return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
+    id: `${tabIdPrefix}-tab-${index}`,
+    'aria-controls': `${tabIdPrefix}-tabpanel-${index}`,
   };
 }
 
-function TabPanel(props: any) {
-  const { children, value, index, ...other } = props;
+function TabPanel({ children, value, index }: TabPanelProps) {
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
+      id={`${tabIdPrefix}-tabpanel-${index}`}
+      aria-labelledby={`${tabIdPrefix}-tab-${index}`}
     >
-      {value === index && (
-        <Box sx={{ pt: 3 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
   );
 }
 
 export default function ConfigurationPage() {
-  const [value, setValue] = useState(0);
+  const history = useHistory();
+  const location = useLocation();
+  const routeIndex = tabRoutes.findIndex(({ path, aliases }) =>
+    [path, ...aliases].some(route => matchesRoute(location.pathname, route))
+  );
+  const value = routeIndex === -1 ? 0 : routeIndex;
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
-    setValue(newValue);
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
+    history.push(routeWithCurrentPrefix(location.pathname, tabRoutes[newValue].path));
   };
 
   return (
     <SectionBox title="Configurations">
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="configuration tabs">
-          <Tab label="Config" {...a11yProps(0)} />
-          <Tab label="SyncSet" {...a11yProps(1)} />
+          <Tab label="Config" {...tabA11yProps(0)} />
+          <Tab label="SyncSet" {...tabA11yProps(1)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>

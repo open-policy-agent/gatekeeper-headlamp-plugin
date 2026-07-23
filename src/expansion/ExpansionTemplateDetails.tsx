@@ -1,32 +1,27 @@
-import {
-  SectionBox,
-} from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
-import {
-  Alert,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Typography,
-  Chip,
-  Paper
-} from '@mui/material';
-import React, { useState } from 'react';
+import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import { Box, Chip, Paper, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import React from 'react';
 import { useParams } from 'react-router-dom';
-import { ExpansionTemplateClass } from '../model';
+import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
+import {
+  ResourceDetailsError,
+  ResourceDetailsLoading,
+  useResourceDetails,
+} from '../components/ResourceDetailsState';
 import { RoutingPath } from '../index';
+import { ExpansionTemplateClass } from '../model';
 
 export default function ExpansionTemplateDetails() {
   const { name } = useParams<{ name: string }>();
-  const [item, setItem] = useState<KubeObject | null>(null);
+  const { item, error } = useResourceDetails(ExpansionTemplateClass, name);
 
-  ExpansionTemplateClass.useApiGet(setItem, name);
+  if (error) {
+    return <ResourceDetailsError error={error} kind="ExpansionTemplate" name={name} />;
+  }
 
   if (!item) {
-    return <Typography>Loading Expansion Template details...</Typography>;
+    return <ResourceDetailsLoading kind="Expansion Template" />;
   }
 
   const data = item.jsonData as any;
@@ -45,7 +40,9 @@ export default function ExpansionTemplateDetails() {
     if (kindsArr.length === 0) return '-';
     return (
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-        {kindsArr.map(k => <Chip key={k} label={k} size="small" variant="outlined" />)}
+        {kindsArr.map(k => (
+          <Chip key={k} label={k} size="small" variant="outlined" />
+        ))}
       </Box>
     );
   }
@@ -74,17 +71,21 @@ export default function ExpansionTemplateDetails() {
       },
       {
         name: 'Generated GVK',
-        value: data.spec?.generatedGVK 
-          ? <Chip label={`${data.spec.generatedGVK.group || 'core'}/${data.spec.generatedGVK.version} ${data.spec.generatedGVK.kind}`} size="small" color="primary" variant="outlined" />
-          : '-',
-      }
+        value: data.spec?.generatedGVK ? (
+          <Chip
+            label={`${data.spec.generatedGVK.group || 'core'}/${data.spec.generatedGVK.version} ${
+              data.spec.generatedGVK.kind
+            }`}
+            size="small"
+            color="primary"
+            variant="outlined"
+          />
+        ) : (
+          '-'
+        ),
+      },
     ];
   }
-  
-  
-  const apiUrl = data.metadata.namespace 
-      ? `/apis/expansion.gatekeeper.sh/v1alpha1/namespaces/${data.metadata.namespace}/expansiontemplate/${data.metadata.name}`
-      : `/apis/expansion.gatekeeper.sh/v1alpha1/expansiontemplate/${data.metadata.name}`;
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
@@ -98,9 +99,8 @@ export default function ExpansionTemplateDetails() {
           </Typography>
         </Box>
         <ResourceDeleteButton
-          name={data.metadata.name}
+          resource={item}
           kind="ExpansionTemplate"
-          apiUrl={apiUrl}
           redirectUrl={RoutingPath.ExpansionTemplates}
         />
       </Box>
@@ -108,7 +108,7 @@ export default function ExpansionTemplateDetails() {
       <SectionBox title="Overview">
         <Table>
           <TableBody>
-            {getMainInfoRows().map((row) => (
+            {getMainInfoRows().map(row => (
               <TableRow key={row.name}>
                 <TableCell component="th" scope="row">
                   {row.name}
@@ -129,37 +129,8 @@ export default function ExpansionTemplateDetails() {
           </Paper>
         </SectionBox>
       )}
-      
-      
-      <SectionBox title="System Sync Status">
-        {(data.status?.errors && data.status.errors.length > 0) || (data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0)) ? (
-          <Box>
-            {data.status?.errors && data.status.errors.length > 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                <strong>Global Error:</strong> {JSON.stringify(data.status.errors)}
-              </Alert>
-            )}
-            {data.status?.byPod && data.status.byPod.some((p: any) => p.errors && p.errors.length > 0) && (
-              <Alert severity="error">
-                <strong>Sync Error:</strong> Failed to load this rule in Gatekeeper.
-                <ul style={{ margin: 0, paddingLeft: '20px', marginTop: '8px' }}>
-                  {data.status.byPod.filter((p: any) => p.errors && p.errors.length > 0).map((p: any) => (
-                    <li key={p.id}>{p.id}: {JSON.stringify(p.errors)}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-          </Box>
-        ) : (data.status?.byPod?.length > 0) ? (
-          <Alert severity="success">
-            Active and successfully synced.
-          </Alert>
-        ) : (
-          <Alert severity="info">
-            Pending or unknown status.
-          </Alert>
-        )}
-      </SectionBox>
+
+      <GatekeeperResourceStatus resource={data} />
     </Box>
   );
 }
