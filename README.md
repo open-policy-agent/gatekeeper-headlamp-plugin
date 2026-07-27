@@ -1,48 +1,67 @@
 # Gatekeeper Headlamp Plugin
 
-A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) policies, violations, and Gatekeeper Library templates in Kubernetes clusters.
+A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) policies, mutations, configurations, external data, violations, and Gatekeeper Library templates in Kubernetes clusters.
 
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/gatekeeper-headlamp-plugin)](https://artifacthub.io/packages/search?repo=gatekeeper-headlamp-plugin)
 
 ## Features
 
-### ConstraintTemplates
-
-- View and browse Gatekeeper ConstraintTemplates in your cluster
-- Filter templates by target
-- View template details including CRD kind/plural, readiness status, creation time, and targets
-- Delete ConstraintTemplates from the UI with a confirmation dialog
-- Detect when Gatekeeper CRDs are not installed and show an installation prompt
-
-![Constraint Templates](images/constraint_template.png)
-
 ### Constraints
+- Manage Gatekeeper constraints and templates (`ConstraintTemplate` and `Constraint`)
+- Monitor current Gatekeeper audit violations dynamically discovered from installed resources
+- Filter lists by targets, resource kinds, or enforcement actions
+- View detailed information including match rules, targets, audit timestamps, and current violation messages
+- Detect missing Gatekeeper CRDs gracefully with installation prompts
+- Seamlessly delete ConstraintTemplates and Constraints from the UI with a confirmation dialog
 
-- Browse constraints discovered dynamically from installed ConstraintTemplates
-- Filter constraints by constraint kind and enforcement action
-- View enforcement action, matched resource kinds, total violation count, and creation time
-- View constraint details including overview, match rules, audit timestamp, and current violations
-- Delete constraints from the UI, using the ConstraintTemplate plural name when available
+![Constraints Overview](images/constraints.png)
 
-![Constraints](images/constraints.png)
+### Mutations
+- Manage Gatekeeper mutation CRDs including `Assign`, `AssignMetadata`, `AssignImage`, and `ModifySet`
+- View mutation details, target kinds, match criteria, and assignment locations/values
+- Easily filter mutations by target kinds or domains
+- Monitor System Sync Status to ensure mutations are properly enforced
+- Seamlessly delete Mutation resources from the UI with a confirmation dialog
 
-### Violations
+![Mutations Overview](images/mutations.png)
 
-- Monitor current Gatekeeper audit violations across constraints
-- Filter violations by resource kind, constraint kind, enforcement action, and resource name
-- View violation messages, affected resources, namespaces, API versions, and related constraints
-- View each constraint's current audit timestamp when available
+### Configurations
+- Manage Gatekeeper core configuration CRDs (`Config` and `SyncSet`)
+- Monitor synced resources, matched configurations, and overview details
+- Check synchronization statuses across your cluster configuration settings
+- Seamlessly delete Configuration resources from the UI with a confirmation dialog
 
-![Violations](images/violations.png)
+![Configurations Overview](images/configurations.png)
+
+### External Data
+- Browse and manage External Data `Provider` resources
+- View configured URLs, timeout values, and active System Sync Statuses
+- Filter Provider components by name and delete them with visual confirmation dialogs
+
+![External Data Overview](images/external_data.png)
+
+### Violation Export
+- Manage External Data `Connection` resources used for Violation Export
+- View driver information, namespace, and configuration details for connected external audit systems
+- Filter Connections by driver and delete them with visual confirmation dialogs
+
+![Violation Export Overview](images/violation_export.png)
+
+### Expansion Templates
+- Manage `ExpansionTemplate` resources for complex mutation/validation workflows
+- View the generated GVK (GroupVersionKind) and template source definitions
+- Filter Expansion Templates by generated GVK and delete template assets effectively
+
+![Expansion Templates Overview](images/expansion_template.png)
 
 ### Gatekeeper Library
-
 - Browse templates from the official OPA Gatekeeper Library by category
 - View template names, descriptions, and raw ConstraintTemplate YAML
 - Customize match criteria and parameters as JSON
 - Generate Constraint YAML and apply the ConstraintTemplate plus generated Constraint to your cluster
+- **Authentication Support:** Add your GitHub Personal Access Token (PAT) directly in the UI to prevent unauthenticated API rate-limit errors and ensure reliable loading. Token logic handles offline/air-gapped environments gracefully.
 
-![Gatekeeper Library](images/library.png)
+![Gatekeeper Library Overview](images/policy_library.png)
 
 ## Prerequisites
 
@@ -50,7 +69,7 @@ A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeep
   - Artifact Hub metadata for this plugin currently declares Headlamp compatibility as `>=0.29`
 - A Kubernetes cluster with [Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/install/) installed
   - If Gatekeeper is not installed, the plugin detects the missing CRDs and provides an installation prompt
-- For plugin development: Node.js v22.0.0 or later and npm v11.0.0 or later are recommended
+- For plugin development: Node.js v18.0.0 (LTS) or later and npm v10.0.0 or later are recommended
 
 ## Installation
 
@@ -153,9 +172,13 @@ gatekeeper-headlamp-plugin/
 │   ├── constraint/          # Constraint list and detail views
 │   ├── constraint-template/ # ConstraintTemplate list and detail views
 │   ├── violations/          # Violation list and detail views
+│   ├── mutation/            # Mutation (Assign, AssignImage, ModifySet) views
+│   ├── configuration/       # Gatekeeper Config and SyncSet views
+│   ├── externaldata/        # Provider and Connection (Violation Export) views
+│   ├── expansion/           # ExpansionTemplate views
 │   ├── library/             # Gatekeeper Library integration
 │   ├── types/               # TypeScript type definitions
-│   ├── model.ts             # ConstraintTemplate model and dynamic constraint discovery
+│   ├── model.ts             # API Models for CRDs and dynamic constraint discovery
 │   └── index.tsx            # Plugin routes and sidebar entries
 ├── images/                  # README and Artifact Hub screenshots
 ├── dist/                    # Build output (temporary)
