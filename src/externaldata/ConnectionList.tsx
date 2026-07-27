@@ -96,6 +96,10 @@ export default function ConnectionList(props: { hideTitle?: boolean }) {
             getter: item => item.metadata.namespace || '-',
           },
           {
+            label: 'Driver',
+            getter: item => getConnectionDriver(item) || '-',
+          },
+          {
             label: 'Age',
             getter: item => item.metadata.creationTimestamp,
           },
