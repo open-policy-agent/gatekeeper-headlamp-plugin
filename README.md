@@ -146,7 +146,3 @@ Common plugin locations:
 ## Contributing
 
 Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflows, validation, and project structure.
-
-## License
-
-Apache-2.0 License - see [LICENSE](LICENSE) for details.
