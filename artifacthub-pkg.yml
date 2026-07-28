@@ -5,26 +5,42 @@ createdAt: '2025-11-03T00:01:56Z'
 description: Headlamp plugin for Gatekeeper
 logoURL: https://www.openpolicyagent.org/img/nav/logo.png
 screenshots:
-  - title: violations
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/violations.png
   - title: constraints
     url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints.png
   - title: constraint-templates
     url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraint_template.png
-  - title: library
+  - title: constraint-details
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints_detail.png
+  - title: violations
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/violations.png
+  - title: mutations
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/mutations.png
+  - title: configurations
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/configurations.png
+  - title: external-data
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/external-data.png
+  - title: violation-export
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/violation-export.png
+  - title: expansion-templates
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/expansion-templates.png
+  - title: policy-library
     url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/library.png
+  - title: policy-library-deployment
+    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/library-deploy.png
 readme: |-
   # Gatekeeper Headlamp Plugin
 
-  This plugin integrates Gatekeeper with Headlamp, providing a UI for managing
-  ConstraintTemplates, Constraints, and viewing violations.
+  This plugin integrates Gatekeeper with Headlamp, providing a UI for policies,
+  mutations, configuration, external data, violation export, expansion templates,
+  and the Gatekeeper Policy Library.
 
   ## Features
 
-  - List and view ConstraintTemplates
-  - List and view Constraints
-  - View Gatekeeper audit violations
-  - Apply policies from Gatekeeper library
+  - Browse ConstraintTemplates, dynamically discovered Constraints, and violations
+  - View Assign, AssignMetadata, AssignImage, and ModifySet mutation resources
+  - Inspect Config, SyncSet, Provider, Connection, and ExpansionTemplate resources
+  - Review Gatekeeper controller status and delete supported resources
+  - Preview and apply policies from the Gatekeeper Policy Library
 install: |
   Desktop Headlamp
   - Install Headlamp (https://headlamp.dev/docs/latest/installation/desktop/)

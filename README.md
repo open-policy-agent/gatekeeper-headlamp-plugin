@@ -1,12 +1,18 @@
 # Gatekeeper Headlamp Plugin
 
-A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) policies, violations, and Gatekeeper Library templates in Kubernetes clusters.
+A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) policies, mutations, configuration, external data, expansion, violation export resources, and Gatekeeper Policy Library templates in Kubernetes clusters.
 
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/gatekeeper-headlamp-plugin)](https://artifacthub.io/packages/search?repo=gatekeeper-headlamp-plugin)
 
 ## Features
 
-### ConstraintTemplates
+The Gatekeeper sidebar is organized by resource domain: **Constraints**, **Mutations**, **Configurations**, **External Data**, **Violation Export**, **Expansion Templates**, and **Policy Library**. Related resource types share tabbed list pages. Resource details use cluster-aware navigation and, where supported, show controller status and confirmed deletion; error states distinguish missing CRDs, authentication failures, RBAC denial, and Kubernetes API failures.
+
+### Constraints
+
+The **Constraints** page groups policy resources into **Constraint Templates**, **Constraints**, and **Violations** tabs, each with its own route for direct linking.
+
+#### Constraint Templates
 
 - View and browse Gatekeeper ConstraintTemplates in your cluster
 - Filter templates by target
@@ -14,9 +20,7 @@ A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeep
 - Delete ConstraintTemplates from the UI with a confirmation dialog
 - Detect when Gatekeeper CRDs are not installed and show an installation prompt
 
-![Constraint Templates](images/constraint_template.png)
-
-### Constraints
+#### Constraints
 
 - Browse constraints discovered dynamically from installed ConstraintTemplates
 - Filter constraints by constraint kind and enforcement action
@@ -24,33 +28,95 @@ A [Headlamp](https://headlamp.dev) plugin for viewing and managing [OPA Gatekeep
 - View constraint details including overview, match rules, audit timestamp, and current violations
 - Delete constraints from the UI, using the ConstraintTemplate plural name when available
 
-![Constraints](images/constraints.png)
-
-### Violations
+#### Violations
 
 - Monitor current Gatekeeper audit violations across constraints
 - Filter violations by resource kind, constraint kind, enforcement action, and resource name
 - View violation messages, affected resources, namespaces, API versions, and related constraints
 - View each constraint's current audit timestamp when available
 
-![Violations](images/violations.png)
+### Mutations
 
-### Gatekeeper Library
+- Browse `Assign`, `AssignMetadata`, `AssignImage`, and `ModifySet` resources in dedicated tabs
+- Filter mutations by target resource kind, and filter `ModifySet` resources by operation
+- Inspect target kinds, mutation locations, assigned values, image references, and set operations
+- Review reconciliation and enforcement status reported in each resource's Gatekeeper status fields, including per-pod observations when available
+- Delete mutation resources from their detail pages
 
-- Browse templates from the official OPA Gatekeeper Library by category
-- View template names, descriptions, and raw ConstraintTemplate YAML
-- Customize match criteria and parameters as JSON
-- Generate Constraint YAML and apply the ConstraintTemplate plus generated Constraint to your cluster
+### Configurations
 
-![Gatekeeper Library](images/library.png)
+- Browse namespaced `Config` resources and cluster-scoped `SyncSet` resources
+- Inspect `Config` sync-only resources and match configurations
+- Filter `SyncSet` resources by synced kind and view their configured group/version/kind entries
+- Review `Config` controller status; `SyncSet` details explicitly note that Gatekeeper does not expose per-resource reconciliation status
+- Delete configuration resources from their detail pages
+
+### External Data
+
+- Browse Gatekeeper `Provider` resources
+- Inspect provider URLs, timeouts, CA bundles, and controller-reported active status
+- Delete providers from their detail pages
+
+### Violation Export
+
+- Browse namespaced `Connection` resources used by Gatekeeper violation export
+- Filter connections by driver and inspect driver-specific configuration
+- Review controller-reported active status and delete connections from their detail pages
+
+### Expansion Templates
+
+- Browse Gatekeeper `ExpansionTemplate` resources
+- Filter by target kind or generated kind
+- Inspect the generated group/version/kind and template source paths
+- Review controller status and delete expansion templates from their detail pages
+
+### Gatekeeper Policy Library
+
+- Browse templates from the official OPA Gatekeeper Library and filter them by category
+- Load only templates with fetched, valid YAML while reporting partial, offline, and GitHub API failures
+- Retry GitHub requests with an optional personal access token, which is kept only in plugin memory and can be cleared from the UI
+- View raw ConstraintTemplate YAML and customize match criteria and parameters as JSON
+- Preview generated Constraint YAML before applying it
+- Apply the ConstraintTemplate and generated Constraint after checking existing template compatibility and waiting for the generated CRD to become established
+
+## Screenshots
+
+| Constraints | Constraint Templates |
+| --- | --- |
+| ![Constraints](images/constraints.png) | ![Constraint Templates](images/constraint_template.png) |
+| **Constraint Details** | **Violations** |
+| ![Constraint Details](images/constraints_detail.png) | ![Violations](images/violations.png) |
+| **Mutations** | **Configurations** |
+| ![Mutations](images/mutations.png) | ![Configurations](images/configurations.png) |
+| **External Data** | **Violation Export** |
+| ![External Data](images/external-data.png) | ![Violation Export](images/violation-export.png) |
+| **Expansion Templates** | **Policy Library** |
+| ![Expansion Templates](images/expansion-templates.png) | ![Policy Library](images/library.png) |
+| **Policy Library Deployment** |  |
+| ![Policy Library Deployment](images/library-deploy.png) |  |
+
+## Supported Gatekeeper APIs
+
+| Resources | API group and versions |
+| --- | --- |
+| `ConstraintTemplate` | `templates.gatekeeper.sh/v1`, `templates.gatekeeper.sh/v1beta1` |
+| Dynamically discovered constraints | `constraints.gatekeeper.sh/v1beta1` |
+| `Assign`, `AssignMetadata`, `AssignImage`, `ModifySet` | `mutations.gatekeeper.sh/v1`, `mutations.gatekeeper.sh/v1beta1`, `mutations.gatekeeper.sh/v1alpha1` |
+| `Config` | `config.gatekeeper.sh/v1alpha1` |
+| `SyncSet` | `syncset.gatekeeper.sh/v1alpha1` |
+| `Provider` | `externaldata.gatekeeper.sh/v1beta1`, `externaldata.gatekeeper.sh/v1alpha1` |
+| `Connection` | `connection.gatekeeper.sh/v1alpha1`, `connection.gatekeeper.sh/v1beta1` |
+| `ExpansionTemplate` | `expansion.gatekeeper.sh/v1alpha1`, `expansion.gatekeeper.sh/v1beta1` |
 
 ## Prerequisites
 
 - [Headlamp](https://headlamp.dev) installed and configured
   - Artifact Hub metadata for this plugin currently declares Headlamp compatibility as `>=0.29`
 - A Kubernetes cluster with [Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/install/) installed
-  - If Gatekeeper is not installed, the plugin detects the missing CRDs and provides an installation prompt
-- For plugin development: Node.js v22.0.0 or later and npm v11.0.0 or later are recommended
+  - If Gatekeeper is not installed, the plugin detects the missing ConstraintTemplate CRDs and provides an installation prompt
+  - Mutation, configuration, external data, violation export, and expansion views require the corresponding optional Gatekeeper CRDs to be installed and served by the cluster
+- Kubernetes RBAC permissions to list and get the Gatekeeper resources you view, delete resources you remove, and create ConstraintTemplates and Constraints when deploying from the Policy Library
+- Network access to GitHub is required to browse the live Gatekeeper Policy Library; an optional personal access token can be supplied for authenticated requests
 
 ## Installation
 
@@ -73,102 +139,10 @@ Download the latest release and extract it to your Headlamp plugins directory.
 
 Common plugin locations:
 
-- **Linux/macOS**: `~/.config/Headlamp/plugins/gatekeeper-headlamp-plugin/`
+- **macOS**: `~/Library/Application Support/Headlamp/plugins/gatekeeper-headlamp-plugin/`
+- **Linux**: `~/.config/Headlamp/plugins/gatekeeper-headlamp-plugin/`
 - **Windows**: `%APPDATA%/Headlamp/Config/plugins/gatekeeper-headlamp-plugin/`
-
-> The Makefile is currently configured to deploy to `~/Library/Application Support/Headlamp/plugins`. If your Headlamp installation uses another plugins directory, update `HEADLAMP_PLUGINS_DIR` in `Makefile` before running `make deploy`, `make dev`, or `make setup`.
-
-## Development
-
-This project uses a `Makefile` for common development workflows.
-
-### Quick Start
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/sozercan/gatekeeper-headlamp-plugin.git
-   cd gatekeeper-headlamp-plugin
-   ```
-
-2. **First-time setup:**
-
-   Installs dependencies, builds the plugin, and deploys it to the configured Headlamp plugins directory:
-
-   ```bash
-   make setup
-   ```
-
-3. **Development workflow:**
-
-   After making code changes, rebuild and deploy:
-
-   ```bash
-   make dev
-   ```
-
-4. **Run checks:**
-
-   ```bash
-   npm test
-   npm run lint
-   npm run tsc
-   npm run format
-   ```
-
-### Available npm Scripts
-
-- `npm run build` - Build the plugin
-- `npm run start` - Start the Headlamp plugin development server
-- `npm run package` - Package the plugin for distribution
-- `npm test` - Run the Headlamp plugin test runner
-- `npm run lint` - Check code style
-- `npm run lint-fix` - Fix code style issues
-- `npm run format` - Format code with Prettier
-- `npm run tsc` - Run the TypeScript compiler
-- `npm run extract` - Extract the built plugin into `.plugins/`
-
-### Makefile Commands
-
-View all available Makefile commands and documentation:
-
-```bash
-make help
-```
-
-Common commands:
-
-- `make setup` - First-time setup (`install` + `build` + `deploy`)
-- `make dev` - Development workflow (`build` + `deploy`)
-- `make build` - Build and extract the plugin
-- `make deploy` - Deploy `.plugins/` to the configured Headlamp plugins directory
-- `make clean` - Clean build artifacts
-- `make validate` - Clean, build, and validate expected output files
-
-### Project Structure
-
-```text
-gatekeeper-headlamp-plugin/
-├── src/
-│   ├── constraint/          # Constraint list and detail views
-│   ├── constraint-template/ # ConstraintTemplate list and detail views
-│   ├── violations/          # Violation list and detail views
-│   ├── library/             # Gatekeeper Library integration
-│   ├── types/               # TypeScript type definitions
-│   ├── model.ts             # ConstraintTemplate model and dynamic constraint discovery
-│   └── index.tsx            # Plugin routes and sidebar entries
-├── images/                  # README and Artifact Hub screenshots
-├── dist/                    # Build output (temporary)
-├── .plugins/                # Extracted plugin package (deployment-ready)
-├── artifacthub-pkg.yml      # Artifact Hub package metadata
-├── artifacthub-repo.yml     # Artifact Hub repository metadata
-└── Makefile                 # Build and deployment automation
-```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request.
-
-## License
-
-Apache-2.0 License - see [LICENSE](LICENSE) for details.
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflows, validation, and project structure.
