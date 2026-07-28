@@ -117,7 +117,6 @@ The **Constraints** page groups policy resources into **Constraint Templates**, 
   - Mutation, configuration, external data, violation export, and expansion views require the corresponding optional Gatekeeper CRDs to be installed and served by the cluster
 - Kubernetes RBAC permissions to list and get the Gatekeeper resources you view, delete resources you remove, and create ConstraintTemplates and Constraints when deploying from the Policy Library
 - Network access to GitHub is required to browse the live Gatekeeper Policy Library; an optional personal access token can be supplied for authenticated requests
-- For plugin development, use Node.js 22.x (matching the release workflow) and npm
 
 ## Installation
 
@@ -144,104 +143,9 @@ Common plugin locations:
 - **Linux**: `~/.config/Headlamp/plugins/gatekeeper-headlamp-plugin/`
 - **Windows**: `%APPDATA%/Headlamp/Config/plugins/gatekeeper-headlamp-plugin/`
 
-> The Makefile defaults to the macOS plugins directory. Override `HEADLAMP_PLUGINS_DIR` on the command line for another installation, for example: `make deploy HEADLAMP_PLUGINS_DIR="$HOME/.config/Headlamp/plugins"`.
-
-## Development
-
-This project uses a `Makefile` for common development workflows.
-
-### Quick Start
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/sozercan/gatekeeper-headlamp-plugin.git
-   cd gatekeeper-headlamp-plugin
-   ```
-
-2. **First-time setup:**
-
-   Installs dependencies, builds the plugin, and deploys it to the configured Headlamp plugins directory:
-
-   ```bash
-   make setup
-   ```
-
-3. **Development workflow:**
-
-   After making code changes, rebuild and deploy:
-
-   ```bash
-   make dev
-   ```
-
-4. **Run checks:**
-
-   ```bash
-   npm test
-   npm run lint
-   npm run tsc
-   ```
-
-### Common npm Scripts
-
-- `npm run build` - Build the plugin
-- `npm run start` - Start the Headlamp plugin development server
-- `npm run package` - Package the plugin for distribution
-- `npm test` - Run the Headlamp plugin test runner
-- `npm run lint` - Check code style
-- `npm run lint-fix` - Fix code style issues
-- `npm run format` - Format code with Prettier
-- `npm run tsc` - Run the TypeScript compiler
-- `npm run extract` - Extract the built plugin into `.plugins/`
-
-### Makefile Commands
-
-View all available Makefile commands and documentation:
-
-```bash
-make help
-```
-
-Common commands:
-
-- `make setup` - First-time setup (`install` + `build` + `deploy`)
-- `make dev` - Development workflow (`build` + `deploy`)
-- `make build` - Build and extract the plugin
-- `make deploy` - Deploy `.plugins/` to the configured Headlamp plugins directory
-- `make clean` - Clean build artifacts
-- `make validate` - Clean, build, and validate expected output files
-
-### Project Structure
-
-```text
-gatekeeper-headlamp-plugin/
-├── src/
-│   ├── components/          # Shared status, error, loading, and delete UI
-│   ├── configuration/       # Config and SyncSet list/detail views
-│   ├── constraint/          # Dynamically discovered Constraint list/detail views
-│   ├── constraint-template/ # ConstraintTemplate list/detail views
-│   ├── constraints/         # Tabbed Constraints, ConstraintTemplates, and Violations page
-│   ├── expansion/           # ExpansionTemplate list/detail views
-│   ├── externaldata/        # Provider and violation export Connection views
-│   ├── library/             # Gatekeeper Policy Library integration and deployment workflow
-│   ├── mutation/            # Assign, AssignMetadata, AssignImage, and ModifySet views
-│   ├── violations/          # Violation list/detail views
-│   ├── types/               # TypeScript type definitions
-│   ├── model.ts             # Gatekeeper CR models and dynamic constraint discovery
-│   ├── resourceData.ts      # Shared Gatekeeper resource data helpers
-│   └── index.tsx            # Plugin routes and sidebar entries
-├── images/                  # Project and Artifact Hub screenshots
-├── dist/                    # Build output (temporary)
-├── .plugins/                # Extracted plugin package (deployment-ready)
-├── artifacthub-pkg.yml      # Artifact Hub package metadata
-├── artifacthub-repo.yml     # Artifact Hub repository metadata
-└── Makefile                 # Build and deployment automation
-```
-
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request.
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflows, validation, and project structure.
 
 ## License
 
