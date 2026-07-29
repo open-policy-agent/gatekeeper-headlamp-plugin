@@ -1,5 +1,6 @@
-import { useCluster } from '@kinvolk/headlamp-plugin/lib/lib/k8s';
-import { KubeObject, type KubeObjectClass } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
+import { K8s } from '@kinvolk/headlamp-plugin/lib';
+const { useCluster } = K8s;
+import type { KubeObject, KubeObjectClass } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Alert, AlertTitle, Box, Typography } from '@mui/material';
 import React from 'react';
 
