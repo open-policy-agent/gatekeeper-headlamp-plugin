@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
-  K8s: { useCluster: () => null,
-  }
+  K8s: { useCluster: () => null },
 }));
 import { buildClusterRedirectPath } from './ResourceDeleteButton';
 import { getResourceErrorPresentation } from './ResourceDetailsState';

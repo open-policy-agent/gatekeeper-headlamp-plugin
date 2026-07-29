@@ -7,8 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const clusterSelection = vi.hoisted(() => ({ current: 'cluster-a' as string | null }));
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
-  K8s: { useCluster: () => clusterSelection.current,
-  }
+  K8s: { useCluster: () => clusterSelection.current },
 }));
 
 import { useResourceDetails } from './ResourceDetailsState';

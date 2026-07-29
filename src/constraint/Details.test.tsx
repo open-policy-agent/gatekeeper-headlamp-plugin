@@ -17,8 +17,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib/ApiProxy', () => ({
 }));
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
-  K8s: { useCluster: () => null,
-  }
+  K8s: { useCluster: () => null },
 }));
 
 vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
