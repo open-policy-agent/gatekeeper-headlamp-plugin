@@ -12,8 +12,7 @@
     "format": "headlamp-plugin format",
     "test": "headlamp-plugin test",
     "tsc": "headlamp-plugin tsc",
-    "extract": "headlamp-plugin extract . .plugins",
-    "test:dynamic-constraints": "node --experimental-vm-modules ./test/test-dynamic-constraints.js"
+    "extract": "headlamp-plugin extract . .plugins"
   },
   "keywords": [
     "headlamp",
