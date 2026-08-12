@@ -44,7 +44,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.11.0",
     "@mui/material": "^5.11.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.2.3",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   }
