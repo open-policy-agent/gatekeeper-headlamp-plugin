@@ -36,7 +36,7 @@
     "@kinvolk/headlamp-plugin": "^0.12.0",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
+    "@types/react-dom": "^19.2.4",
     "typescript": "^5.0.0"
   },
   "dependencies": {
@@ -46,6 +46,6 @@
     "@mui/material": "^5.11.0",
     "js-yaml": "^4.1.0",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^19.2.8"
   }
 }
