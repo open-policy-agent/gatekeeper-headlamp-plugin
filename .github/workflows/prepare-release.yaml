@@ -1,0 +1,155 @@
+name: Prepare Release
+
+env:
+  NODE_VERSION: '22.X'
+  RELEASE_VERSION: '${{ inputs.releaseVersion }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: 'Release version (without v prefix)'
+        required: true
+        type: string
+
+concurrency:
+  group: prepare-release-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare release pull request
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Require master branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+            echo "::error::Prepare Release must be dispatched from master."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Validate release version
+        run: |
+          node <<'NODE'
+          const version = process.env.RELEASE_VERSION;
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+          if (!semver.test(version)) {
+            throw new Error(`Release version must be valid SemVer without a v prefix: ${version}`);
+          }
+
+          if (require('./package.json').version === version) {
+            throw new Error(`package.json is already at version ${version}`);
+          }
+          NODE
+
+          remote_tag="$(git ls-remote --tags origin "refs/tags/$RELEASE_VERSION")"
+          if [ -n "$remote_tag" ]; then
+            echo "::error::Tag $RELEASE_VERSION already exists."
+            exit 1
+          fi
+
+      - name: Apply release version
+        run: |
+          npm version "$RELEASE_VERSION" --no-git-tag-version
+          node <<'NODE'
+          const packageJson = require('./package.json');
+          const packageLock = require('./package-lock.json');
+          const expectedVersion = process.env.RELEASE_VERSION;
+
+          if (
+            packageJson.version !== expectedVersion ||
+            packageLock.version !== expectedVersion ||
+            packageLock.packages?.['']?.version !== expectedVersion
+          ) {
+            throw new Error('Release version was not applied to package metadata');
+          }
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format -- --check
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run TypeScript checks
+        run: npm run tsc
+
+      - name: Run tests
+        run: npm test
+        env:
+          CI: 'true'
+
+      - name: Validate plugin build
+        run: make validate
+
+      - name: Verify packaged version
+        run: |
+          node -e "if (require('./.plugins/package.json').version !== process.env.RELEASE_VERSION) throw new Error('Packaged plugin version does not match release version')"
+
+      - name: Push release branch
+        env:
+          RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
+        run: |
+          git diff --check
+          remote_branch="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")"
+          if [ -n "$remote_branch" ]; then
+            git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
+            if ! git diff --quiet "origin/$RELEASE_BRANCH" -- package.json package-lock.json; then
+              echo "::error::Branch $RELEASE_BRANCH already exists with different package metadata."
+              exit 1
+            fi
+            echo "Reusing existing branch $RELEASE_BRANCH."
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git switch --create "$RELEASE_BRANCH"
+            git add package.json package-lock.json
+            git commit --signoff --message "chore(release): prepare $RELEASE_VERSION"
+            git push --set-upstream origin "$RELEASE_BRANCH"
+          fi
+
+      - name: Open release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
+        run: |
+          existing_pr="$(gh pr list --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
+          if [ -n "$existing_pr" ]; then
+            echo "Release pull request: $existing_pr" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          pr_body="Bumps the plugin package metadata to ${RELEASE_VERSION}. After this PR is approved and merged, run the Release workflow from master with the same version."
+          if pr_url="$(gh pr create \
+            --base master \
+            --head "$RELEASE_BRANCH" \
+            --title "chore(release): prepare $RELEASE_VERSION" \
+            --body "$pr_body" 2>&1)"; then
+            echo "Release pull request: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+          else
+            encoded_branch="$(jq -rn --arg value "$RELEASE_BRANCH" '$value | @uri')"
+            compare_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/master...$encoded_branch?expand=1"
+            echo "::warning::The release branch was pushed, but GitHub Actions could not open the pull request: $pr_url"
+            echo "Open the release pull request: $compare_url" >> "$GITHUB_STEP_SUMMARY"
+          fi
