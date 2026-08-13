@@ -1,7 +1,9 @@
 name: Release
+
 env:
   NODE_VERSION: '22.X'
-  RELEASE_TAR: 'gatekeeper-headlamp-plugin-${{ github.event.inputs.releaseVersion }}.tar.gz'
+  RELEASE_VERSION: '${{ inputs.releaseVersion }}'
+  RELEASE_TAR: 'gatekeeper-headlamp-plugin-${{ inputs.releaseVersion }}.tar.gz'
 
 on:
   workflow_dispatch:
@@ -9,7 +11,7 @@ on:
       releaseVersion:
         description: 'Release version (without v prefix)'
         required: true
-        default: '0.0.0'
+        type: string
 
 concurrency:
   group: release-${{ github.repository }}
@@ -20,9 +22,10 @@ permissions:
 
 jobs:
   release:
-    name: Release
+    name: Publish and verify release
     permissions:
       contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -39,6 +42,8 @@ jobs:
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -47,24 +52,36 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Apply release version
-        env:
-          RELEASE_VERSION: ${{ github.event.inputs.releaseVersion }}
+      - name: Validate release version
         run: |
-          npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
           node <<'NODE'
           const packageJson = require('./package.json');
           const packageLock = require('./package-lock.json');
           const expectedVersion = process.env.RELEASE_VERSION;
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+          if (!semver.test(expectedVersion)) {
+            throw new Error(`Release version must be valid SemVer without a v prefix: ${expectedVersion}`);
+          }
 
           if (
             packageJson.version !== expectedVersion ||
             packageLock.version !== expectedVersion ||
             packageLock.packages?.['']?.version !== expectedVersion
           ) {
-            throw new Error('Release version was not applied to package metadata');
+            throw new Error('Release version does not match the package metadata on master');
           }
           NODE
+
+          remote_tag="$(git ls-remote --tags origin "refs/tags/$RELEASE_VERSION")"
+          if [ -n "$remote_tag" ]; then
+            git fetch --force origin "refs/tags/$RELEASE_VERSION:refs/tags/$RELEASE_VERSION"
+            tag_commit="$(git rev-parse --verify "refs/tags/$RELEASE_VERSION^{commit}")"
+            if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $RELEASE_VERSION already points to $tag_commit, not $GITHUB_SHA."
+              exit 1
+            fi
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -87,16 +104,26 @@ jobs:
         run: make validate
 
       - name: Verify packaged version
-        env:
-          RELEASE_VERSION: ${{ github.event.inputs.releaseVersion }}
         run: |
           node -e "if (require('./.plugins/package.json').version !== process.env.RELEASE_VERSION) throw new Error('Packaged plugin version does not match release version')"
 
       - name: Create Archive
         run: |
-          mkdir -p gatekeeper-headlamp-plugin
-          cp .plugins/* gatekeeper-headlamp-plugin
-          tar -czf "$RELEASE_TAR" gatekeeper-headlamp-plugin
+          package_dir='gatekeeper-headlamp-plugin'
+          rm -rf "$package_dir"
+          mkdir -p "$package_dir"
+          cp -a .plugins/. "$package_dir/"
+          find "$package_dir" -exec touch -h --date='@0' {} +
+          tar \
+            --sort=name \
+            --mtime='@0' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            --format=ustar \
+            --create \
+            --file=- \
+            "$package_dir" | gzip --no-name > "$RELEASE_TAR"
 
       - name: Calculate Checksum
         id: checksum
@@ -104,10 +131,62 @@ jobs:
           checksum="$(sha256sum "$RELEASE_TAR" | cut -d' ' -f1)"
           echo "value=$checksum" >> "$GITHUB_OUTPUT"
 
-      - name: Calculate Date
-        id: date
+      - name: Check for existing release
+        id: existing_release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "value=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+          if gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'value=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'value=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub prerelease
+        if: steps.existing_release.outputs.value != 'true'
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ inputs.releaseVersion }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: ${{ env.RELEASE_TAR }}
+          token: ${{ github.token }}
+
+      - name: Verify public release archive
+        env:
+          EXPECTED_CHECKSUM: ${{ steps.checksum.outputs.value }}
+        run: |
+          archive_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$RELEASE_VERSION/$RELEASE_TAR"
+          mkdir -p release-verification
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --output release-verification/archive.tar.gz \
+            "$archive_url"
+          echo "$EXPECTED_CHECKSUM  release-verification/archive.tar.gz" | sha256sum --check
+          tar -xzf release-verification/archive.tar.gz -C release-verification
+          RELEASE_PACKAGE="release-verification/gatekeeper-headlamp-plugin/package.json" node <<'NODE'
+          const packageJson = require(`./${process.env.RELEASE_PACKAGE}`);
+          if (packageJson.version !== process.env.RELEASE_VERSION) {
+            throw new Error(`Published plugin version ${packageJson.version} does not match ${process.env.RELEASE_VERSION}`);
+          }
+          NODE
+
+      - name: Read release publication date
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published_at="$(gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --json publishedAt --jq .publishedAt)"
+          if [ -z "$published_at" ]; then
+            echo '::error::GitHub release does not have a publication date.'
+            exit 1
+          fi
+          echo "published_at=$published_at" >> "$GITHUB_OUTPUT"
 
       - name: Update artifacthub-pkg.yml
         uses: fjogeleit/yaml-update-action@dffe9a5223d84653c13374032382f6bb5de8e5ef # v0.17.0
@@ -115,27 +194,82 @@ jobs:
           valueFile: artifacthub-pkg.yml
           changes: |
             {
-              "version": "${{ github.event.inputs.releaseVersion }}",
-              "createdAt": "${{ steps.date.outputs.value }}",
-              "annotations[\"headlamp/plugin/archive-url\"]": "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.releaseVersion }}/${{ env.RELEASE_TAR }}",
+              "version": "${{ inputs.releaseVersion }}",
+              "digest": "${{ steps.checksum.outputs.value }}",
+              "prerelease": true,
+              "createdAt": "${{ steps.release.outputs.published_at }}",
+              "annotations[\"headlamp/plugin/archive-url\"]": "https://github.com/${{ github.repository }}/releases/download/${{ inputs.releaseVersion }}/${{ env.RELEASE_TAR }}",
               "annotations[\"headlamp/plugin/archive-checksum\"]": "SHA256:${{ steps.checksum.outputs.value }}"
             }
           commitChange: false
 
-      - name: Commit Changes
-        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
-        with:
-          message: 'chore(release): ${{ github.event.inputs.releaseVersion }}'
-          commit: --signoff
-          add: |
-            - artifacthub-pkg.yml
-            - package.json
-            - package-lock.json
+      - name: Verify Artifact Hub metadata
+        env:
+          EXPECTED_CHECKSUM: ${{ steps.checksum.outputs.value }}
+          RELEASE_PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const yaml = require('js-yaml');
+          const metadata = yaml.load(fs.readFileSync('artifacthub-pkg.yml', 'utf8'));
+          const expectedArchiveUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/releases/download/${process.env.RELEASE_VERSION}/${process.env.RELEASE_TAR}`;
+          const expectedChecksum = `SHA256:${process.env.EXPECTED_CHECKSUM}`;
 
-      - name: Create Release Draft
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          tag_name: ${{ github.event.inputs.releaseVersion }}
-          prerelease: true
-          files: ${{ env.RELEASE_TAR }}
-          token: ${{ github.token }}
+          if (
+            metadata.version !== process.env.RELEASE_VERSION ||
+            metadata.digest !== process.env.EXPECTED_CHECKSUM ||
+            metadata.prerelease !== true ||
+            metadata.createdAt !== process.env.RELEASE_PUBLISHED_AT ||
+            metadata.annotations?.['headlamp/plugin/archive-url'] !== expectedArchiveUrl ||
+            metadata.annotations?.['headlamp/plugin/archive-checksum'] !== expectedChecksum
+          ) {
+            throw new Error('Artifact Hub metadata does not match the published release');
+          }
+          NODE
+
+      - name: Push Artifact Hub metadata branch
+        env:
+          METADATA_BRANCH: artifacthub/${{ inputs.releaseVersion }}
+        run: |
+          git diff --check
+          remote_branch="$(git ls-remote --heads origin "refs/heads/$METADATA_BRANCH")"
+          if [ -n "$remote_branch" ]; then
+            git fetch origin "refs/heads/$METADATA_BRANCH:refs/remotes/origin/$METADATA_BRANCH"
+            if ! git diff --quiet "origin/$METADATA_BRANCH" -- artifacthub-pkg.yml; then
+              echo "::error::Branch $METADATA_BRANCH already exists with different Artifact Hub metadata."
+              exit 1
+            fi
+            echo "Reusing existing branch $METADATA_BRANCH."
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git switch --create "$METADATA_BRANCH"
+            git add artifacthub-pkg.yml
+            git commit --signoff --message "chore(release): publish $RELEASE_VERSION metadata"
+            git push --set-upstream origin "$METADATA_BRANCH"
+          fi
+
+      - name: Open Artifact Hub metadata pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          METADATA_BRANCH: artifacthub/${{ inputs.releaseVersion }}
+        run: |
+          existing_pr="$(gh pr list --head "$METADATA_BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
+          if [ -n "$existing_pr" ]; then
+            echo "Artifact Hub metadata pull request: $existing_pr" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          pr_body="Publishes the verified ${RELEASE_VERSION} archive metadata for Artifact Hub. The GitHub prerelease and public archive already exist and passed checksum and packaged-version verification."
+          if pr_url="$(gh pr create \
+            --base master \
+            --head "$METADATA_BRANCH" \
+            --title "chore(release): publish $RELEASE_VERSION metadata" \
+            --body "$pr_body" 2>&1)"; then
+            echo "Artifact Hub metadata pull request: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+          else
+            encoded_branch="$(jq -rn --arg value "$METADATA_BRANCH" '$value | @uri')"
+            compare_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/master...$encoded_branch?expand=1"
+            echo "::warning::The metadata branch was pushed, but GitHub Actions could not open the pull request: $pr_url"
+            echo "Open the Artifact Hub metadata pull request: $compare_url" >> "$GITHUB_STEP_SUMMARY"
+          fi

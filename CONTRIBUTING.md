@@ -130,3 +130,17 @@ gatekeeper-headlamp-plugin/
 ## Pull requests
 
 Keep pull requests focused, explain the user impact, and include the validation commands you ran. Add or update tests and screenshots when changing user-visible behavior.
+
+## Releases
+
+Releases use two reviewed pull requests so the `master` branch rules remain enforced and Artifact Hub never indexes an archive before it has been published and verified.
+
+1. In GitHub Actions, run **Prepare Release** from `master` with the new semantic version without a `v` prefix, for example `0.3.0`.
+2. Review and merge the generated `release/<version>` pull request. This pull request updates `package.json` and `package-lock.json` and requires the normal approval and DCO checks.
+3. Run **Release** from `master` with the same version. The workflow rejects versions that do not match the package metadata on `master`.
+4. The workflow validates and packages the plugin, publishes a GitHub prerelease, downloads the public archive, and verifies its checksum and embedded package version.
+5. Review and merge the generated `artifacthub/<version>` pull request. Artifact Hub will discover the new version from `artifacthub-pkg.yml` after that merge; no Artifact Hub upload or token is required.
+
+If repository workflow settings prevent GitHub Actions from opening either pull request, the workflow summary contains a link for opening it manually from the branch that was pushed.
+
+After the Artifact Hub metadata pull request is merged, verify the version in the [Artifact Hub package listing](https://artifacthub.io/packages/headlamp/gatekeeper-headlamp-plugin/gatekeeper) and install it from Headlamp. Releases are currently marked as prereleases in both GitHub and Artifact Hub.

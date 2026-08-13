@@ -1,4 +1,6 @@
 version: 0.2.0
+digest: 1e961c482a2845291761b799b9c8892fd70baa0a5d7a5e5b2a881a64528c5060
+prerelease: true
 name: gatekeeper
 displayName: Gatekeeper
 createdAt: '2025-11-03T00:01:56Z'
@@ -6,27 +8,27 @@ description: Headlamp plugin for Gatekeeper
 logoURL: https://www.openpolicyagent.org/img/nav/logo.png
 screenshots:
   - title: constraints
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints.png
   - title: constraint-templates
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraint_template.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/constraint_template.png
   - title: constraint-details
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints_detail.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/constraints_detail.png
   - title: violations
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/violations.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/violations.png
   - title: mutations
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/mutations.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/mutations.png
   - title: configurations
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/configurations.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/configurations.png
   - title: external-data
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/external-data.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/external-data.png
   - title: violation-export
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/violation-export.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/violation-export.png
   - title: expansion-templates
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/expansion-templates.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/expansion-templates.png
   - title: policy-library
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/library.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/library.png
   - title: policy-library-deployment
-    url: https://raw.githubusercontent.com/sozercan/gatekeeper-headlamp-plugin/refs/heads/master/images/library-deploy.png
+    url: https://raw.githubusercontent.com/open-policy-agent/gatekeeper-headlamp-plugin/refs/heads/master/images/library-deploy.png
 readme: |-
   # Gatekeeper Headlamp Plugin
 
@@ -45,6 +47,7 @@ install: |
   Desktop Headlamp
   - Install Headlamp (https://headlamp.dev/docs/latest/installation/desktop/)
   - Open Plugin Catalog
+  - Clear the Official filter if enabled; this plugin is verified but not marked official
   - Select the Gatekeeper plugin and click the install button
   - After install you may need to restart Headlamp
 keywords:
@@ -55,11 +58,11 @@ keywords:
   - policy
 links:
   - name: source
-    url: https://github.com/sozercan/gatekeeper-headlamp-plugin
+    url: https://github.com/open-policy-agent/gatekeeper-headlamp-plugin
   - name: Gatekeeper
     url: https://open-policy-agent.github.io/gatekeeper/
 annotations:
-  headlamp/plugin/archive-url: https://github.com/sozercan/gatekeeper-headlamp-plugin/releases/download/0.2.0/gatekeeper-headlamp-plugin-0.2.0.tar.gz
+  headlamp/plugin/archive-url: https://github.com/open-policy-agent/gatekeeper-headlamp-plugin/releases/download/0.2.0/gatekeeper-headlamp-plugin-0.2.0.tar.gz
   headlamp/plugin/archive-checksum: SHA256:1e961c482a2845291761b799b9c8892fd70baa0a5d7a5e5b2a881a64528c5060
   headlamp/plugin/version-compat: '>=0.29'
   headlamp/plugin/distro-compat: in-cluster,web,docker-desktop,desktop
