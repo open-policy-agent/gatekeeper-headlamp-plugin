@@ -139,8 +139,10 @@ Releases use one reviewed pull request. Its temporary `release/<version>` branch
 2. Review and merge the generated pull request. It updates `package.json`, `package-lock.json`, and `artifacthub-pkg.yml`, and requires the normal approval and DCO checks.
 3. Merging the pull request starts the **Release** workflow. The workflow rebuilds the plugin, checks the archive against the committed Artifact Hub metadata, publishes a GitHub prerelease, and verifies the public download.
 
+If `master` advances while the release pull request is open, run **Prepare Release** again with the same version instead of using GitHub's **Update branch** button. The workflow rebuilds from current `master`, verifies that the temporary branch contains only generated release metadata, and refreshes it without changing `createdAt`.
+
 If repository workflow settings prevent GitHub Actions from opening the pull request, the workflow summary contains a link for opening it manually from the branch that was pushed. GitHub deletes the temporary release branch after merge.
 
-If the automatic release run does not start, run **Release** manually from `master` with the same version. The metadata reaches `master` before the archive is published, so rerun a failed release against its original merge commit.
+Rerun a failed **Release** workflow from its existing workflow run so it keeps the original merge commit. If GitHub did not create the automatic run, dispatch **Release** manually from `master` with the same version before `master` advances again. If a checksum mismatch is discovered after merge and no tag was published, run **Prepare Release** again with the same version to create a repair pull request.
 
 After publication, verify the version in the [Artifact Hub package listing](https://artifacthub.io/packages/headlamp/gatekeeper-headlamp-plugin/gatekeeper) and install it from Headlamp. Releases are currently marked as prereleases in both GitHub and Artifact Hub.

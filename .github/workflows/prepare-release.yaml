@@ -37,6 +37,8 @@ jobs:
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -54,10 +56,6 @@ jobs:
           if (!semver.test(version)) {
             throw new Error(`Release version must be valid SemVer without a v prefix: ${version}`);
           }
-
-          if (require('./package.json').version === version) {
-            throw new Error(`package.json is already at version ${version}`);
-          }
           NODE
 
           remote_tag="$(git ls-remote --tags origin "refs/tags/$RELEASE_VERSION")"
@@ -66,9 +64,52 @@ jobs:
             exit 1
           fi
 
+      - name: Inspect existing release branch
+        id: release_branch
+        env:
+          RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
+        run: |
+          remote_tip="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH" | cut -f1)"
+          if [ -z "$remote_tip" ]; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
+          merge_base="$(git merge-base HEAD "origin/$RELEASE_BRANCH")"
+          unexpected_files="$(
+            git diff --name-only "$merge_base" "origin/$RELEASE_BRANCH" |
+              awk '$0 != "package.json" && $0 != "package-lock.json" && $0 != "artifacthub-pkg.yml"'
+          )"
+
+          if [ -n "$unexpected_files" ]; then
+            echo "::error::Branch $RELEASE_BRANCH contains changes outside the generated release metadata:"
+            printf '%s\n' "$unexpected_files"
+            exit 1
+          fi
+
+          RELEASE_METADATA="$RUNNER_TEMP/existing-artifacthub-pkg.yml"
+          git show "origin/$RELEASE_BRANCH:artifacthub-pkg.yml" > "$RELEASE_METADATA"
+          RELEASE_METADATA="$RELEASE_METADATA" node <<'NODE'
+          const fs = require('fs');
+          const yaml = require('js-yaml');
+          const metadata = yaml.load(fs.readFileSync(process.env.RELEASE_METADATA, 'utf8'));
+
+          if (
+            metadata.version !== process.env.RELEASE_VERSION ||
+            typeof metadata.createdAt !== 'string' ||
+            Number.isNaN(Date.parse(metadata.createdAt))
+          ) {
+            throw new Error('Existing release branch metadata does not match the requested version');
+          }
+          NODE
+
+          echo 'exists=true' >> "$GITHUB_OUTPUT"
+          echo "remote_tip=$remote_tip" >> "$GITHUB_OUTPUT"
+
       - name: Apply release version
         run: |
-          npm version "$RELEASE_VERSION" --no-git-tag-version
+          npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
           node <<'NODE'
           const packageJson = require('./package.json');
           const packageLock = require('./package-lock.json');
@@ -128,15 +169,14 @@ jobs:
       - name: Calculate release metadata
         id: release_metadata
         env:
+          BRANCH_EXISTS: ${{ steps.release_branch.outputs.exists }}
           RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
         run: |
           release_tar="gatekeeper-headlamp-plugin-$RELEASE_VERSION.tar.gz"
           checksum="$(sha256sum "$release_tar" | cut -d' ' -f1)"
           created_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
 
-          remote_branch="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")"
-          if [ -n "$remote_branch" ]; then
-            git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
+          if [ "$BRANCH_EXISTS" = 'true' ]; then
             existing_metadata="$RUNNER_TEMP/artifacthub-pkg.yml"
             git show "origin/$RELEASE_BRANCH:artifacthub-pkg.yml" > "$existing_metadata"
             created_at="$(METADATA_FILE="$existing_metadata" node -p "require('js-yaml').load(require('fs').readFileSync(process.env.METADATA_FILE, 'utf8')).createdAt")"
@@ -185,39 +225,61 @@ jobs:
           NODE
 
       - name: Push release branch
+        id: push_release_branch
         env:
+          BRANCH_EXISTS: ${{ steps.release_branch.outputs.exists }}
+          REMOTE_TIP: ${{ steps.release_branch.outputs.remote_tip }}
           RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
         run: |
           git diff --check
-          remote_branch="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")"
-          if [ -n "$remote_branch" ]; then
-            git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
-            if ! git diff --quiet "origin/$RELEASE_BRANCH" -- package.json package-lock.json artifacthub-pkg.yml; then
-              echo "::error::Branch $RELEASE_BRANCH already exists with different release metadata."
-              exit 1
-            fi
-            echo "Reusing existing branch $RELEASE_BRANCH."
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --create "$RELEASE_BRANCH"
+          git add package.json package-lock.json artifacthub-pkg.yml
+
+          if git diff --cached --quiet; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo "Release metadata for $RELEASE_VERSION is already current. Run the Release workflow manually if publication still needs to be retried." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git commit --signoff --message "chore(release): prepare $RELEASE_VERSION"
+
+          if [ "$BRANCH_EXISTS" = 'true' ]; then
+            git push \
+              --force-with-lease="refs/heads/$RELEASE_BRANCH:$REMOTE_TIP" \
+              origin \
+              "HEAD:refs/heads/$RELEASE_BRANCH"
+            echo "Refreshed existing branch $RELEASE_BRANCH from current master."
           else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git switch --create "$RELEASE_BRANCH"
-            git add package.json package-lock.json artifacthub-pkg.yml
-            git commit --signoff --message "chore(release): prepare $RELEASE_VERSION"
             git push --set-upstream origin "$RELEASE_BRANCH"
           fi
 
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
       - name: Open release pull request
+        if: steps.push_release_branch.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
         run: |
-          existing_pr="$(gh pr list --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
+          repository_owner="${GITHUB_REPOSITORY%%/*}"
+          if ! existing_pr="$(gh api \
+              --method GET \
+              "repos/$GITHUB_REPOSITORY/pulls" \
+              -f state=open \
+              -f base=master \
+              -f head="$repository_owner:$RELEASE_BRANCH" \
+              --jq '.[0].html_url // empty' 2>/dev/null)"; then
+            echo '::warning::Could not check for an existing release pull request; attempting to create it.'
+            existing_pr=''
+          fi
           if [ -n "$existing_pr" ]; then
             echo "Release pull request: $existing_pr" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          pr_body="Prepares ${RELEASE_VERSION} package and Artifact Hub metadata. Merging this PR approves and starts publication of the GitHub prerelease."
+          pr_body="Prepares ${RELEASE_VERSION} package and Artifact Hub metadata. Merging this PR approves and starts publication of the GitHub prerelease. If master advances before merge, rerun Prepare Release with the same version instead of updating this branch manually."
           if pr_url="$(gh pr create \
             --base master \
             --head "$RELEASE_BRANCH" \
