@@ -133,14 +133,14 @@ Keep pull requests focused, explain the user impact, and include the validation 
 
 ## Releases
 
-Releases use two reviewed pull requests so the `master` branch rules remain enforced and Artifact Hub never indexes an archive before it has been published and verified.
+Releases use one reviewed pull request. Its temporary `release/<version>` branch contains the package version and Artifact Hub metadata.
 
 1. In GitHub Actions, run **Prepare Release** from `master` with the new semantic version without a `v` prefix, for example `0.3.0`.
-2. Review and merge the generated `release/<version>` pull request. This pull request updates `package.json` and `package-lock.json` and requires the normal approval and DCO checks.
-3. Run **Release** from `master` with the same version. The workflow rejects versions that do not match the package metadata on `master`.
-4. The workflow validates and packages the plugin, publishes a GitHub prerelease, downloads the public archive, and verifies its checksum and embedded package version.
-5. Review and merge the generated `artifacthub/<version>` pull request. Artifact Hub will discover the new version from `artifacthub-pkg.yml` after that merge; no Artifact Hub upload or token is required.
+2. Review and merge the generated pull request. It updates `package.json`, `package-lock.json`, and `artifacthub-pkg.yml`, and requires the normal approval and DCO checks.
+3. Merging the pull request starts the **Release** workflow. The workflow rebuilds the plugin, checks the archive against the committed Artifact Hub metadata, publishes a GitHub prerelease, and verifies the public download.
 
-If repository workflow settings prevent GitHub Actions from opening either pull request, the workflow summary contains a link for opening it manually from the branch that was pushed.
+If repository workflow settings prevent GitHub Actions from opening the pull request, the workflow summary contains a link for opening it manually from the branch that was pushed. GitHub deletes the temporary release branch after merge.
 
-After the Artifact Hub metadata pull request is merged, verify the version in the [Artifact Hub package listing](https://artifacthub.io/packages/headlamp/gatekeeper-headlamp-plugin/gatekeeper) and install it from Headlamp. Releases are currently marked as prereleases in both GitHub and Artifact Hub.
+If the automatic release run does not start, run **Release** manually from `master` with the same version. The metadata reaches `master` before the archive is published, so rerun a failed release against its original merge commit.
+
+After publication, verify the version in the [Artifact Hub package listing](https://artifacthub.io/packages/headlamp/gatekeeper-headlamp-plugin/gatekeeper) and install it from Headlamp. Releases are currently marked as prereleases in both GitHub and Artifact Hub.

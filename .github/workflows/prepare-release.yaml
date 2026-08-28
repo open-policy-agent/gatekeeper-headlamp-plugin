@@ -107,6 +107,83 @@ jobs:
         run: |
           node -e "if (require('./.plugins/package.json').version !== process.env.RELEASE_VERSION) throw new Error('Packaged plugin version does not match release version')"
 
+      - name: Create release archive
+        run: |
+          package_dir='gatekeeper-headlamp-plugin'
+          rm -rf "$package_dir"
+          mkdir -p "$package_dir"
+          cp -a .plugins/. "$package_dir/"
+          find "$package_dir" -exec touch -h --date='@0' {} +
+          tar \
+            --sort=name \
+            --mtime='@0' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            --format=ustar \
+            --create \
+            --file=- \
+            "$package_dir" | gzip --no-name > "gatekeeper-headlamp-plugin-$RELEASE_VERSION.tar.gz"
+
+      - name: Calculate release metadata
+        id: release_metadata
+        env:
+          RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
+        run: |
+          release_tar="gatekeeper-headlamp-plugin-$RELEASE_VERSION.tar.gz"
+          checksum="$(sha256sum "$release_tar" | cut -d' ' -f1)"
+          created_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+
+          remote_branch="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")"
+          if [ -n "$remote_branch" ]; then
+            git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
+            existing_metadata="$RUNNER_TEMP/artifacthub-pkg.yml"
+            git show "origin/$RELEASE_BRANCH:artifacthub-pkg.yml" > "$existing_metadata"
+            created_at="$(METADATA_FILE="$existing_metadata" node -p "require('js-yaml').load(require('fs').readFileSync(process.env.METADATA_FILE, 'utf8')).createdAt")"
+          fi
+
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          echo "created_at=$created_at" >> "$GITHUB_OUTPUT"
+
+      - name: Update Artifact Hub metadata
+        uses: fjogeleit/yaml-update-action@dffe9a5223d84653c13374032382f6bb5de8e5ef # v0.17.0
+        with:
+          valueFile: artifacthub-pkg.yml
+          changes: |
+            {
+              "version": "${{ inputs.releaseVersion }}",
+              "digest": "${{ steps.release_metadata.outputs.checksum }}",
+              "prerelease": true,
+              "createdAt": "${{ steps.release_metadata.outputs.created_at }}",
+              "annotations[\"headlamp/plugin/archive-url\"]": "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ inputs.releaseVersion }}/gatekeeper-headlamp-plugin-${{ inputs.releaseVersion }}.tar.gz",
+              "annotations[\"headlamp/plugin/archive-checksum\"]": "SHA256:${{ steps.release_metadata.outputs.checksum }}"
+            }
+          commitChange: false
+
+      - name: Verify Artifact Hub metadata
+        env:
+          EXPECTED_CHECKSUM: ${{ steps.release_metadata.outputs.checksum }}
+          RELEASE_CREATED_AT: ${{ steps.release_metadata.outputs.created_at }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const yaml = require('js-yaml');
+          const metadata = yaml.load(fs.readFileSync('artifacthub-pkg.yml', 'utf8'));
+          const expectedArchiveUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/releases/download/${process.env.RELEASE_VERSION}/gatekeeper-headlamp-plugin-${process.env.RELEASE_VERSION}.tar.gz`;
+          const expectedChecksum = `SHA256:${process.env.EXPECTED_CHECKSUM}`;
+
+          if (
+            metadata.version !== process.env.RELEASE_VERSION ||
+            metadata.digest !== process.env.EXPECTED_CHECKSUM ||
+            metadata.prerelease !== true ||
+            metadata.createdAt !== process.env.RELEASE_CREATED_AT ||
+            metadata.annotations?.['headlamp/plugin/archive-url'] !== expectedArchiveUrl ||
+            metadata.annotations?.['headlamp/plugin/archive-checksum'] !== expectedChecksum
+          ) {
+            throw new Error('Artifact Hub metadata does not match the prepared release');
+          }
+          NODE
+
       - name: Push release branch
         env:
           RELEASE_BRANCH: release/${{ inputs.releaseVersion }}
@@ -115,8 +192,8 @@ jobs:
           remote_branch="$(git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH")"
           if [ -n "$remote_branch" ]; then
             git fetch origin "refs/heads/$RELEASE_BRANCH:refs/remotes/origin/$RELEASE_BRANCH"
-            if ! git diff --quiet "origin/$RELEASE_BRANCH" -- package.json package-lock.json; then
-              echo "::error::Branch $RELEASE_BRANCH already exists with different package metadata."
+            if ! git diff --quiet "origin/$RELEASE_BRANCH" -- package.json package-lock.json artifacthub-pkg.yml; then
+              echo "::error::Branch $RELEASE_BRANCH already exists with different release metadata."
               exit 1
             fi
             echo "Reusing existing branch $RELEASE_BRANCH."
@@ -124,7 +201,7 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git switch --create "$RELEASE_BRANCH"
-            git add package.json package-lock.json
+            git add package.json package-lock.json artifacthub-pkg.yml
             git commit --signoff --message "chore(release): prepare $RELEASE_VERSION"
             git push --set-upstream origin "$RELEASE_BRANCH"
           fi
@@ -140,7 +217,7 @@ jobs:
             exit 0
           fi
 
-          pr_body="Bumps the plugin package metadata to ${RELEASE_VERSION}. After this PR is approved and merged, run the Release workflow from master with the same version."
+          pr_body="Prepares ${RELEASE_VERSION} package and Artifact Hub metadata. Merging this PR approves and starts publication of the GitHub prerelease."
           if pr_url="$(gh pr create \
             --base master \
             --head "$RELEASE_BRANCH" \
