@@ -124,10 +124,11 @@ The **Constraints** page groups policy resources into **Constraint Templates**, 
 
 1. Install and launch [Headlamp](https://headlamp.dev)
 2. Open the Plugin Catalog from the Headlamp menu
-3. Search for "Gatekeeper"
-4. Click the install button next to the Gatekeeper plugin
-5. Restart Headlamp if required
-6. The "Gatekeeper" section will appear in the sidebar
+3. Clear the **Official** filter if it is enabled; this plugin is verified on Artifact Hub but is not marked official
+4. Search for "Gatekeeper"
+5. Click the install button next to the Gatekeeper plugin
+6. Restart Headlamp if required
+7. The "Gatekeeper" section will appear in the sidebar
 
 ### From Artifact Hub
 
