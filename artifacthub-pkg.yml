@@ -1,9 +1,9 @@
-version: 0.2.0
-digest: 1e961c482a2845291761b799b9c8892fd70baa0a5d7a5e5b2a881a64528c5060
+version: 0.3.0
+digest: e88ff62f030111b27120ddee7ee41aeec180c7adf2589b866b6ecb5bdc2a5c22
 prerelease: true
 name: gatekeeper
 displayName: Gatekeeper
-createdAt: '2025-11-03T00:01:56Z'
+createdAt: '2026-08-29T00:05:57Z'
 description: Headlamp plugin for Gatekeeper
 logoURL: https://www.openpolicyagent.org/img/nav/logo.png
 screenshots:
@@ -62,7 +62,7 @@ links:
   - name: Gatekeeper
     url: https://open-policy-agent.github.io/gatekeeper/
 annotations:
-  headlamp/plugin/archive-url: https://github.com/open-policy-agent/gatekeeper-headlamp-plugin/releases/download/0.2.0/gatekeeper-headlamp-plugin-0.2.0.tar.gz
-  headlamp/plugin/archive-checksum: SHA256:1e961c482a2845291761b799b9c8892fd70baa0a5d7a5e5b2a881a64528c5060
+  headlamp/plugin/archive-url: https://github.com/open-policy-agent/gatekeeper-headlamp-plugin/releases/download/0.3.0/gatekeeper-headlamp-plugin-0.3.0.tar.gz
+  headlamp/plugin/archive-checksum: SHA256:e88ff62f030111b27120ddee7ee41aeec180c7adf2589b866b6ecb5bdc2a5c22
   headlamp/plugin/version-compat: '>=0.29'
   headlamp/plugin/distro-compat: in-cluster,web,docker-desktop,desktop
