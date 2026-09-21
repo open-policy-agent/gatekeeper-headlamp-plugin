@@ -66,6 +66,8 @@ vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
+    useHistory: () => ({ push: vi.fn(), goBack: vi.fn(), action: 'POP' }),
+    useLocation: () => ({ pathname: '/gatekeeper/expansion/expansiontemplates' }),
     useParams: () => ({ name: mocks.routeName.current }),
   };
 });

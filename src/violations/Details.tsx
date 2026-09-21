@@ -2,8 +2,9 @@ import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/Comm
 import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import BackButton from '../components/BackButton';
 import { ResourceDetailsError, ResourceDetailsLoading } from '../components/ResourceDetailsState';
-import { RouteName } from '../index';
+import { RouteName, RoutingPath } from '../index';
 import { ConstraintClass } from '../model';
 
 interface ViolationsDetailsProps {}
@@ -15,11 +16,14 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
 
   if (error) {
     return (
-      <ResourceDetailsError
-        error={error}
-        kind={kind ? `${kind} Constraint` : 'Constraint'}
-        name={name}
-      />
+      <Box sx={{ pt: 2, pb: 2 }}>
+        <BackButton fallbackUrl={RoutingPath.Violations} />
+        <ResourceDetailsError
+          error={error}
+          kind={kind ? `${kind} Constraint` : 'Constraint'}
+          name={name}
+        />
+      </Box>
     );
   }
 
@@ -123,6 +127,7 @@ function ViolationsDetails({}: ViolationsDetailsProps) {
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
+      <BackButton fallbackUrl={RoutingPath.Violations} />
       <Typography variant="h4" gutterBottom>
         Violations for {constraint.metadata.name}
       </Typography>

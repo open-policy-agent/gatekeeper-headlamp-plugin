@@ -2,6 +2,7 @@ import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Box, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import BackButton from '../components/BackButton';
 import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
 import {
@@ -17,7 +18,12 @@ export default function ProviderDetails() {
   const { item, error } = useResourceDetails(ProviderClass, name);
 
   if (error) {
-    return <ResourceDetailsError error={error} kind="Provider" name={name} />;
+    return (
+      <Box sx={{ pt: 2, pb: 2 }}>
+        <BackButton fallbackUrl={RoutingPath.Providers} />
+        <ResourceDetailsError error={error} kind="Provider" name={name} />
+      </Box>
+    );
   }
 
   if (!item) {
@@ -70,6 +76,7 @@ export default function ProviderDetails() {
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
+      <BackButton fallbackUrl={RoutingPath.Providers} />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
           <Typography variant="h4" gutterBottom>

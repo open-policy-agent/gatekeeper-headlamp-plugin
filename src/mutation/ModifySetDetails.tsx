@@ -2,6 +2,7 @@ import { SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Box, Chip, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import BackButton from '../components/BackButton';
 import { GatekeeperResourceStatus } from '../components/GatekeeperResourceStatus';
 import ResourceDeleteButton from '../components/ResourceDeleteButton';
 import {
@@ -17,7 +18,12 @@ export default function ModifySetDetails() {
   const { item, error } = useResourceDetails(ModifySetClass, name);
 
   if (error) {
-    return <ResourceDetailsError error={error} kind="ModifySet" name={name} />;
+    return (
+      <Box sx={{ pt: 2, pb: 2 }}>
+        <BackButton fallbackUrl={RoutingPath.ModifySets} />
+        <ResourceDetailsError error={error} kind="ModifySet" name={name} />
+      </Box>
+    );
   }
 
   if (!item) {
@@ -92,6 +98,7 @@ export default function ModifySetDetails() {
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
+      <BackButton fallbackUrl={RoutingPath.ModifySets} />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
           <Typography variant="h4" gutterBottom>

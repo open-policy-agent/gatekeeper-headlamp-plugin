@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import React, { useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
+import BackButton from '../components/BackButton';
 import {
   buildClusterRedirectPath,
   isSameHistoryLocation,
@@ -54,11 +55,14 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
   if (error) {
     return (
-      <ResourceDetailsError
-        error={error}
-        kind={kind ? `${kind} Constraint` : 'Constraint'}
-        name={name}
-      />
+      <Box sx={{ pt: 2, pb: 2 }}>
+        <BackButton fallbackUrl={RoutingPath.Constraints} />
+        <ResourceDetailsError
+          error={error}
+          kind={kind ? `${kind} Constraint` : 'Constraint'}
+          name={name}
+        />
+      </Box>
     );
   }
 
@@ -222,6 +226,7 @@ function ConstraintDetails({}: ConstraintDetailsProps) {
 
   return (
     <Box sx={{ pt: 2, pb: 2 }}>
+      <BackButton fallbackUrl={RoutingPath.Constraints} />
       {/* Header with title and delete button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>

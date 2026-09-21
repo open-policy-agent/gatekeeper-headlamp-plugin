@@ -23,6 +23,8 @@ vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
+    useHistory: () => ({ push: vi.fn(), goBack: vi.fn(), action: 'POP' }),
+    useLocation: () => ({ pathname: '/gatekeeper/violations' }),
     useParams: () => ({ kind: 'K8sRequiredLabels', name: 'shared-constraint' }),
   };
 });
@@ -30,6 +32,9 @@ vi.mock('react-router-dom', async importOriginal => {
 vi.mock('../index', () => ({
   RouteName: {
     Constraint: 'Constraint Details',
+  },
+  RoutingPath: {
+    Violations: '/gatekeeper/violations',
   },
 }));
 

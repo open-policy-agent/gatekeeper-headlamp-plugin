@@ -15,6 +15,7 @@ const routeContext = vi.hoisted(() => ({
 vi.mock('react-router-dom', () => ({
   useParams: () => routeContext.params,
   useLocation: () => ({ state: routeContext.state }),
+  useHistory: () => ({ push: vi.fn(), goBack: vi.fn(), action: 'POP' }),
 }));
 
 vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({

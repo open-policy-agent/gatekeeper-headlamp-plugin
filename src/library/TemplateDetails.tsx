@@ -15,6 +15,8 @@ import {
 import yaml from 'js-yaml';
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
+import BackButton from '../components/BackButton';
+import { RoutingPath } from '../index';
 import GitHubRequestControls from './GitHubRequestControls';
 import {
   buildTemplateId,
@@ -592,6 +594,7 @@ function LibraryTemplateDetails() {
     const offline = isOfflineError(loadError);
     return (
       <SectionBox title="Library Template Details">
+        <BackButton fallbackUrl={RoutingPath.Library} />
         <Alert severity={offline ? 'warning' : 'error'} sx={{ mb: 2 }}>
           <AlertTitle>{offline ? 'Unable to Reach GitHub' : 'Template Load Failed'}</AlertTitle>
           {loadError ? getErrorMessage(loadError) : 'Could not load template details.'}
@@ -608,6 +611,7 @@ function LibraryTemplateDetails() {
 
   return (
     <Box sx={{ p: 2 }}>
+      <BackButton fallbackUrl={RoutingPath.Library} />
       <Typography variant="h5" gutterBottom>
         Library Template: {libraryTemplateItem.name}
       </Typography>

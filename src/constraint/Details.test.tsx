@@ -37,6 +37,9 @@ vi.mock('react-router-dom', async importOriginal => {
       location: { pathname: '/gatekeeper/constraints/K8sRequiredLabels/shared-constraint' },
       replace: mocks.historyReplace,
     }),
+    useLocation: () => ({
+      pathname: '/gatekeeper/constraints/K8sRequiredLabels/shared-constraint',
+    }),
     useParams: () => ({ kind: 'K8sRequiredLabels', name: 'shared-constraint' }),
   };
 });
