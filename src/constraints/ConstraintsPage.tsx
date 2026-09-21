@@ -41,14 +41,24 @@ function tabA11yProps(index: number) {
 }
 
 function TabPanel({ children, value, index }: TabPanelProps) {
+  const hasBeenActive = React.useRef(value === index);
+  if (value === index) {
+    hasBeenActive.current = true;
+  }
+
+  if (!hasBeenActive.current) {
+    return null;
+  }
+
   return (
     <div
       role="tabpanel"
       hidden={value !== index}
       id={`${tabIdPrefix}-tabpanel-${index}`}
       aria-labelledby={`${tabIdPrefix}-tab-${index}`}
+      style={{ display: value === index ? 'block' : 'none' }}
     >
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+      <Box sx={{ pt: 3 }}>{children}</Box>
     </div>
   );
 }

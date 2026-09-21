@@ -233,70 +233,76 @@ async function fetchConstraintsOfType(constraintType: string): Promise<any[]> {
 // Dynamic constraint class that discovers types at runtime
 export const ConstraintClass = {
   useApiList: (setData: (data: any) => void) => {
-    const [allConstraints, setAllConstraints] = React.useState<any[]>([]);
-    const [discoveredTypes, setDiscoveredTypes] = React.useState<ConstraintTypeDefinition[]>([]);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState<Error | null>(null);
+    const setDataRef = React.useRef(setData);
+    setDataRef.current = setData;
 
     React.useEffect(() => {
-      const performDiscovery = async () => {
-        setLoading(true);
-        setError(null);
+      let cancelled = false;
 
+      const fetchAll = async () => {
+        let types: ConstraintTypeDefinition[] = [];
         try {
-          const types = await discoverConstraintTypes();
-          setDiscoveredTypes(types);
+          types = await discoverConstraintTypes();
+          if (cancelled) return;
         } catch (e: any) {
-          setError(e);
-          setDiscoveredTypes([]);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      performDiscovery();
-    }, [setData]);
-
-    React.useEffect(() => {
-      if (loading) return;
-
-      if (error || discoveredTypes.length === 0) {
-        setAllConstraints([]);
-        setData([]);
-        return;
-      }
-
-      const fetchAllConstraintData = async () => {
-        const allData: any[] = [];
-        let fetchErrorOccurred = false;
-
-        for (const { plural } of discoveredTypes) {
-          try {
-            const constraints = await fetchConstraintsOfType(plural);
-            if (constraints.length > 0) {
-              allData.push(...constraints);
-            }
-          } catch (e: any) {
-            console.error(
-              `[model.ts] useApiList: Failed to fetch constraints for type ${plural}:`,
-              e
-            );
-            fetchErrorOccurred = true;
+          console.error('[model.ts] useApiList: Failed to discover constraint types:', e);
+          if (!cancelled) {
+            setDataRef.current([]);
           }
+          return;
         }
+
+        if (cancelled) return;
+
+        if (types.length === 0) {
+          if (!cancelled) {
+            setDataRef.current([]);
+          }
+          return;
+        }
+
+        let fetchErrorOccurred = false;
+        const results = await Promise.allSettled(
+          types.map(async ({ plural }) => {
+            try {
+              return await fetchConstraintsOfType(plural);
+            } catch (e: any) {
+              console.error(
+                `[model.ts] useApiList: Failed to fetch constraints for type ${plural}:`,
+                e
+              );
+              fetchErrorOccurred = true;
+              return [];
+            }
+          })
+        );
+
+        if (cancelled) return;
 
         if (fetchErrorOccurred) {
           console.warn('[model.ts] useApiList: One or more constraint types failed to fetch.');
         }
-        setAllConstraints(allData);
+
+        const allData: any[] = [];
+        for (const result of results) {
+          if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+            if (result.value.length > 0) {
+              allData.push(...result.value);
+            }
+          }
+        }
+
+        if (!cancelled) {
+          setDataRef.current(allData);
+        }
       };
 
-      fetchAllConstraintData();
-    }, [discoveredTypes, loading, error, setData]);
+      fetchAll();
 
-    React.useEffect(() => {
-      setData(allConstraints);
-    }, [allConstraints, setData]);
+      return () => {
+        cancelled = true;
+      };
+    }, []);
   },
 
   useApiGet: (
